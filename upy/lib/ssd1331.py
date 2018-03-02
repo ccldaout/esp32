@@ -5,10 +5,11 @@ import sys
 import time
 
 from display import *
-import config
-
-
-config = config.ssd1331
+try:
+    import config
+    config = config.ssd1331
+except:
+    from configobj import empty_config as config
 
 
 #----------------------------------------------------------------------------
