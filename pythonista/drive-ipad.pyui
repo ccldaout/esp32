@@ -1,0 +1,144 @@
+[
+  {
+    "selected" : false,
+    "frame" : "{{0, 0}, {485, 516}}",
+    "class" : "View",
+    "nodes" : [
+      {
+        "selected" : false,
+        "frame" : "{{21, 15}, {317, 32}}",
+        "class" : "TextField",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "uuid" : "A46A6048-8E33-4603-9AC7-FFA1411FC753",
+          "background_color" : "RGBA(0.933333,1.000000,0.933333,1.000000)",
+          "frame" : "{{170, 254}, {200, 32}}",
+          "alignment" : "left",
+          "autocorrection_type" : "default",
+          "text_color" : "RGBA(0.235849,0.235849,0.235849,1.000000)",
+          "placeholder" : "IP address",
+          "text" : "192.168.0.105",
+          "font_name" : "<System>",
+          "spellchecking_type" : "default",
+          "class" : "TextField",
+          "name" : "IP_address",
+          "font_size" : 17
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{353, 15}, {112, 32}}",
+        "class" : "Button",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "uuid" : "B5D32FF0-751E-4C17-9B8A-2208AA8C480F",
+          "corner_radius" : 6,
+          "background_color" : "RGBA(1.000000,0.966667,0.900000,1.000000)",
+          "frame" : "{{230, 254}, {80, 32}}",
+          "tint_color" : "RGBA(0.462264,0.462264,0.462264,1.000000)",
+          "border_width" : 0,
+          "title" : "CONNECT",
+          "action" : "",
+          "font_bold" : true,
+          "class" : "Button",
+          "name" : "connect",
+          "font_size" : 15
+        }
+      },
+      {
+        "selected" : true,
+        "frame" : "{{21, 193}, {300, 300}}",
+        "class" : "View",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "flex" : "RT",
+          "border_width" : 0,
+          "custom_class" : "ControlPad",
+          "frame" : "{{220, 220}, {100, 100}}",
+          "class" : "View",
+          "background_color" : "RGBA(0.820755,0.820755,0.820755,1.000000)",
+          "uuid" : "EE76F9C5-C933-44A9-A7AC-44934FEDEAD4",
+          "corner_radius" : 10,
+          "name" : "control_pad"
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{353, 193}, {112, 32}}",
+        "class" : "Button",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "action" : "",
+          "frame" : "{{230, 242}, {80, 32}}",
+          "tint_color" : "RGBA(0.462264,0.462264,0.462264,1.000000)",
+          "title" : "START",
+          "uuid" : "36825C0A-B6BA-4CEA-85E4-55EF149690A0",
+          "background_color" : "RGBA(1.000000,0.966667,0.900000,1.000000)",
+          "class" : "Button",
+          "font_bold" : true,
+          "name" : "start",
+          "font_size" : 15
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{353, 238}, {112, 32}}",
+        "class" : "Button",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "action" : "",
+          "frame" : "{{230, 242}, {80, 32}}",
+          "tint_color" : "RGBA(0.464623,0.464623,0.464623,1.000000)",
+          "title" : "RESET",
+          "uuid" : "D61329BB-E82F-4A3A-AF88-56C7B4B1EBBB",
+          "background_color" : "RGBA(1.000000,0.866667,0.866667,1.000000)",
+          "class" : "Button",
+          "name" : "reset",
+          "font_size" : 15
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{21, 55}, {444, 130}}",
+        "class" : "TextView",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "uuid" : "0F8B8E06-0BB8-495C-B6EB-24EA292EF4D9",
+          "flex" : "WH",
+          "background_color" : "RGBA(0.319182,0.326782,0.341981,1.000000)",
+          "frame" : "{{143, 158}, {200, 200}}",
+          "tint_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
+          "editable" : false,
+          "alignment" : "left",
+          "autocorrection_type" : "default",
+          "text_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
+          "font_name" : "<System>",
+          "spellchecking_type" : "default",
+          "class" : "TextView",
+          "name" : "message",
+          "font_size" : 14
+        }
+      }
+    ],
+    "attributes" : {
+      "tint_color" : "RGBA(0.000000,0.478000,1.000000,1.000000)",
+      "enabled" : true,
+      "border_color" : "RGBA(0.000000,0.000000,0.000000,1.000000)",
+      "background_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
+      "custom_class" : "",
+      "flex" : ""
+    }
+  }
+]
