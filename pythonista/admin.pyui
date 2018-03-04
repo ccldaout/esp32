@@ -1,0 +1,137 @@
+[
+  {
+    "selected" : false,
+    "frame" : "{{0, 0}, {540, 540}}",
+    "class" : "View",
+    "nodes" : [
+      {
+        "selected" : false,
+        "frame" : "{{28, 20}, {214, 32}}",
+        "class" : "TextField",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "uuid" : "97E54126-08B5-4CD8-86A7-E75E6D7DECC1",
+          "background_color" : "RGBA(0.890196,0.835294,1.000000,1.000000)",
+          "frame" : "{{170, 254}, {200, 32}}",
+          "alignment" : "left",
+          "autocorrection_type" : "default",
+          "text" : "",
+          "placeholder" : "IP address",
+          "font_name" : "<System>",
+          "spellchecking_type" : "default",
+          "class" : "TextField",
+          "name" : "ip_address",
+          "font_size" : 17
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{28, 68}, {150, 32}}",
+        "class" : "Label",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "font_size" : 18,
+          "border_width" : 0,
+          "corner_radius" : 6,
+          "frame" : "{{195, 254}, {150, 32}}",
+          "uuid" : "70E50C67-31F0-4AE5-9CB0-19DA264A7ED8",
+          "class" : "Label",
+          "alignment" : "center",
+          "text" : "Not Ready",
+          "background_color" : "RGBA(0.682353,0.682353,0.682353,1.000000)",
+          "name" : "ipc_status",
+          "font_name" : "<System>"
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{406, 20}, {102, 32}}",
+        "class" : "Button",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "frame" : "{{230, 254}, {80, 32}}",
+          "tint_color" : "RGBA(0.202830,0.202830,0.202830,1.000000)",
+          "title" : "RESET",
+          "uuid" : "A05ABDED-BB34-4401-83E5-7277D1448B19",
+          "background_color" : "RGBA(1.000000,0.866667,0.866667,1.000000)",
+          "class" : "Button",
+          "name" : "reset",
+          "font_size" : 15
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{406, 68}, {102, 32}}",
+        "class" : "Button",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "frame" : "{{230, 254}, {80, 32}}",
+          "tint_color" : "RGBA(0.238208,0.238208,0.238208,1.000000)",
+          "title" : "UPLOAD",
+          "uuid" : "D1B5B02C-F4E7-42F5-AFB9-36FF845D39CA",
+          "background_color" : "RGBA(0.866667,0.911111,1.000000,1.000000)",
+          "class" : "Button",
+          "border_color" : "RGBA(0.341176,0.341176,0.341176,1.000000)",
+          "name" : "upload",
+          "font_size" : 15
+        }
+      },
+      {
+        "selected" : false,
+        "frame" : "{{250, 20}, {102, 32}}",
+        "class" : "Button",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "frame" : "{{230, 254}, {80, 32}}",
+          "tint_color" : "RGBA(0.238208,0.238208,0.238208,1.000000)",
+          "title" : "CONNECT",
+          "uuid" : "D1B5B02C-F4E7-42F5-AFB9-36FF845D39CA",
+          "background_color" : "RGBA(0.866667,0.911111,1.000000,1.000000)",
+          "class" : "Button",
+          "border_color" : "RGBA(0.341176,0.341176,0.341176,1.000000)",
+          "name" : "connect",
+          "font_size" : 15
+        }
+      },
+      {
+        "selected" : true,
+        "frame" : "{{28, 123}, {480, 390}}",
+        "class" : "TableView",
+        "nodes" : [
+
+        ],
+        "attributes" : {
+          "flex" : "WH",
+          "data_source_items" : "",
+          "uuid" : "A716C620-A575-45C4-A329-19446776034F",
+          "frame" : "{{170, 170}, {200, 200}}",
+          "data_source_number_of_lines" : 1,
+          "class" : "TableView",
+          "background_color" : "RGBA(1.0, 1.0, 1.0, 1.0)",
+          "data_source_delete_enabled" : false,
+          "data_source_font_size" : 14,
+          "name" : "file_selection",
+          "row_height" : 44
+        }
+      }
+    ],
+    "attributes" : {
+      "name" : "",
+      "enabled" : true,
+      "background_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
+      "tint_color" : "RGBA(0.000000,0.478000,1.000000,1.000000)",
+      "border_color" : "RGBA(0.000000,0.000000,0.000000,1.000000)",
+      "flex" : ""
+    }
+  }
+]
