@@ -94,7 +94,7 @@ class WifiProgressSSD1331(uwifi.WifiProgressBase):
         self._disp_ssid(self._ssid, True)
         self._disp_mode(self._mode, True)
         self._disp_ip(ip_address)
-        self._disp_message('Connected.')
+        self._disp_message('Ready !!')
 
 
 def start_wifi():
