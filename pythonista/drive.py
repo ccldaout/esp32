@@ -1,8 +1,12 @@
 # coding: utf-8
 
 import ui
+from utils import Config
 from tpp import ipc
 
+CONFIG_PATH = '.drive.config'
+config = Config.load(CONFIG_PATH)
+	
 class ControlPad(ui.View):
 	def __init__(self):
 		self.vector = lambda x,y:None
@@ -49,6 +53,8 @@ class RobotController(object):
 		
 		v_ipaddress = topv['IP_address']
 		v_ipaddress.action = self.enter_ipaddress
+		if config.ip_address:
+			v_ipaddress.text = config.ip_address
 		
 		v_button_connect = topv['connect']
 		v_button_connect.action = self.do_connect
@@ -73,7 +79,9 @@ class RobotController(object):
 		
 	def enter_ipaddress(self, sender):
 		self.v_message.text = sender.text
-		
+		config.ip_address = sender.text
+		config.save()
+				
 	def do_connect(self, sender):
 		pass
 		

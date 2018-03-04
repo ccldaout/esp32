@@ -3,6 +3,7 @@
 import binascii
 import ui
 import glob
+from mdialog import MessageDialog
 from utils import Config
 from tpp import ipc
 
@@ -56,31 +57,36 @@ def list_uploadable():
 		yield f[n:]
 		
 class Admin(object):
-	def __init__(self, topv, admcmd):
+	
+	def __init__(self, topv, mdiag, admcmd):
 		self._admcmd = admcmd
+		self._mdiag = mdiag
 		
 		topv.background_color = '#2f2f2f'
 		
-		v_ipaddress = topv['ip_address']
-		v_ipaddress.action = self.enter_ipaddress
+		v = topv['ip_address']
+		v.action = self.enter_ipaddress
 		if config.ip_address:
-			v_ipaddress.text = config.ip_address
+			v.text = config.ip_address
 			
-		v_button_connect = topv['connect']
-		v_button_connect.action = self.do_connect
+		v = topv['connect']
+		v.action = self.do_connect
 		
-		v_button_upload = topv['upload']
-		v_button_upload.action = self.do_upload
+		v = topv['upload']
+		v.action = self.do_upload
 		
-		v_button_reset = topv['reset']
-		v_button_reset.action = self.do_reset
+		v = topv['clear_selection']
+		v.action = self.do_clear_selection
+		
+		v = topv['reset']
+		v.action = self.do_reset
 		
 		self.v_status = topv['ipc_status']
 		
-		v_fileselection = topv['file_selection']
-		v_fileselection.data_source = ui.ListDataSource(list_uploadable())
-		v_fileselection.allows_multiple_selection = True
-		self.v_fileselection = v_fileselection
+		v = topv['file_selection']
+		v.data_source = ui.ListDataSource(list_uploadable())
+		v.allows_multiple_selection = True
+		self.v_fileselection = v
 		
 	def ipc_ready(self, status):
 		if status:
@@ -98,17 +104,25 @@ class Admin(object):
 		self._admcmd.start(config.ip_address)
 		self.ipc_ready(True)
 		
+	def do_clear_selection(self, sender):
+		v = ui.TextView()
+		
+		self.v_fileselection.reload()
+		
 	def do_upload(self, sender):
+		self._mdiag.open()
 		files = self.v_fileselection.data_source.items
-		for row, _ in self.v_fileselection.selected_rows:
-			self._admcmd.put(files[row])
+		for _, row in self.v_fileselection.selected_rows:
+			path = files[row]
+			ret = self._admcmd.put(path)
+			self._mdiag.put('%s ... %s\n' % (path, ('NG', 'OK')[bool(ret)]))
 		self.v_fileselection.reload()
 		
 	def do_reset(self, sender):
 		self._admcmd.reset()
 		self.ipc_ready(False)
-		
-v = ui.load_view()
-Admin(v, AdminCommand())
-v.present('sheet')
+
+mainview = ui.load_view()
+Admin(mainview, MessageDialog(), AdminCommand())
+mainview.present('sheet')
 

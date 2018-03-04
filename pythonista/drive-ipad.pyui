@@ -5,7 +5,7 @@
     "class" : "View",
     "nodes" : [
       {
-        "selected" : false,
+        "selected" : true,
         "frame" : "{{21, 15}, {317, 32}}",
         "class" : "TextField",
         "nodes" : [
@@ -19,7 +19,7 @@
           "autocorrection_type" : "default",
           "text_color" : "RGBA(0.235849,0.235849,0.235849,1.000000)",
           "placeholder" : "IP address",
-          "text" : "192.168.0.105",
+          "text" : "",
           "font_name" : "<System>",
           "spellchecking_type" : "default",
           "class" : "TextField",
@@ -50,7 +50,7 @@
         }
       },
       {
-        "selected" : true,
+        "selected" : false,
         "frame" : "{{21, 193}, {300, 300}}",
         "class" : "View",
         "nodes" : [
@@ -116,7 +116,7 @@
         ],
         "attributes" : {
           "uuid" : "0F8B8E06-0BB8-495C-B6EB-24EA292EF4D9",
-          "flex" : "WH",
+          "font_size" : 14,
           "background_color" : "RGBA(0.319182,0.326782,0.341981,1.000000)",
           "frame" : "{{143, 158}, {200, 200}}",
           "tint_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
@@ -128,17 +128,17 @@
           "spellchecking_type" : "default",
           "class" : "TextView",
           "name" : "message",
-          "font_size" : 14
+          "flex" : "WH"
         }
       }
     ],
     "attributes" : {
-      "tint_color" : "RGBA(0.000000,0.478000,1.000000,1.000000)",
+      "flex" : "",
       "enabled" : true,
+      "tint_color" : "RGBA(0.000000,0.478000,1.000000,1.000000)",
       "border_color" : "RGBA(0.000000,0.000000,0.000000,1.000000)",
       "background_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
-      "custom_class" : "",
-      "flex" : ""
+      "custom_class" : ""
     }
   }
 ]
