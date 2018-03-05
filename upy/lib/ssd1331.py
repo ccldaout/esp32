@@ -454,8 +454,11 @@ class Adaptor(AdaptorBase):
     def display_size(self):
         return (self._driver.WIDTH, self._driver.HEIGHT)
 
-    def fcf_change_color(self, fg_pixel, bg_pixel):
-        return self.fcf.change_color(fg_pixel, bg_pixel)
+    def display_on(self):
+        self._driver.set_display_on()
+
+    def display_off(self):
+        self._driver.set_display_off()
 
     def draw_image(self, col, row, img):
         driver = self._driver
@@ -490,6 +493,9 @@ class Adaptor(AdaptorBase):
         return self._driver.draw_rectangle(col_start, row_start,
                                            col_end, row_end,
                                            *listing())
+
+    def fcf_change_color(self, fg_pixel, bg_pixel):
+        return self.fcf.change_color(fg_pixel, bg_pixel)
 
     def fcf_put(self, col, row, chars, spacing=0):
         fcf = self.fcf

@@ -1,4 +1,5 @@
 import array
+import sys
 
 
 #----------------------------------------------------------------------------
@@ -138,21 +139,19 @@ class AdaptorBase(object):
         self.Color = Color
         self.Image = Image
 
+        global display
+        display = self
+
         return self
 
     @property
     def display_size(self):
         raise NotImplementedError()
 
-    @property
-    def fcf_size(self):
-        return (self.fcf.WIDTH, self.fcf.HEIGHT)
+    def display_on(self):
+        raise NotImplementedError()
 
-    @property
-    def gcf_size(self):
-        return (self.gcf.WIDTH, self.gcf.HEIGHT)
-
-    def fcf_change_color(self, fg_pixel, bg_pixel):
+    def display_off(self):
         raise NotImplementedError()
 
     def pixel(self, r, g, b):
@@ -176,8 +175,148 @@ class AdaptorBase(object):
                   col_end, row_end):
         raise NotImplementedError()
 
-    def fcf_put(self, col, row, chars):
+    def fcf_change_color(self, fg_pixel, bg_pixel):
         raise NotImplementedError()
 
-    def gcf_put(self, col, row, chars):
+    @property
+    def fcf_size(self):
+        return (self.fcf.WIDTH, self.fcf.HEIGHT)
+
+    @property
+    def gcf_size(self):
+        return (self.gcf.WIDTH, self.gcf.HEIGHT)
+
+    def fcf_put(self, col, row, chars, spacing=0):
         raise NotImplementedError()
+
+    def gcf_put(self, col, row, chars, spacing=0):
+        raise NotImplementedError()
+
+class DummyAdaptor(AdaptorBase):
+
+    def __new__(cls):
+        if sys.implementation.name == 'micropython':
+            # Whene super class is not object, super().__new__ seems to be
+            # bound method in the MicroPython.
+            self = super().__new__(use_fcf=False, use_gcf=False)
+        else:
+            self = super().__new__(cls, use_fcf=False, use_gcf=False)
+        return self
+
+    @property
+    def display_size(self):
+        return 32, 32
+
+    def display_on(self):
+        pass
+
+    def display_off(self):
+        pass
+
+    def pixel(self, r, g, b):
+        return array.array('B', (((0x1f & r)<<3)|((0x3f & g)>>3),
+                                 ((0x7 & g)<<5)|(0x1f & b)))
+
+    def clear(self,
+              col_start=0, row_start=0,
+              col_end=95, row_end=63):
+        pass
+
+    def draw_image(self, col, row, imgbuf):
+        pass
+
+    def draw_line(self,
+                  col_start, row_start,
+                  col_end, row_end):
+        pass
+
+    def draw_rect(self,
+                  col_start, row_start,
+                  col_end, row_end):
+        pass
+
+    def copy(self,
+             col_start, row_start,
+             col_end, row_end,
+             new_col_start, new_row_start):
+        pass
+
+    def clear(self,
+              col_start=0, row_start=0,
+              col_end=95, row_end=63):
+        pass
+
+    def fcf_change_color(self, fg_pixel, bg_pixel):
+        pass
+
+    @property
+    def fcf_size(self):
+        return (4, 7)
+
+    @property
+    def gcf_size(self):
+        return (5, 10)
+
+    def fcf_put(self, col, row, chars, spacing=0):
+        pass
+
+    def gcf_put(self, col, row, chars, spacing=0):
+        pass
+
+
+#----------------------------------------------------------------------------
+#                        text display area (use fcf)
+#----------------------------------------------------------------------------
+
+class TextBoard(object):
+
+    def __init__(self, disp, col_beg, row_beg, col_end, row_end, ch_spacing=0, line_spacing=0):
+        self._disp = disp
+        self._area = (col_beg, row_beg, col_end, row_end)
+        self._fw, self._fh = disp.fcf_size
+        self._fw += ch_spacing
+        self._fh += line_spacing
+        self._ch_spacing = ch_spacing
+        self._height = self._fh
+        self._ncol = (col_end - col_beg + 1 + ch_spacing)//self._fw
+        self._nrow = (row_end - row_beg + 1 + line_spacing)//self._fh
+        self._ccol = 0
+        self._crow = 0
+        self._linefeed = False
+
+        global text_board
+        text_board = self
+
+    def scrollup(self):
+        col_beg, row_beg, col_end, row_end = self._area
+        self._disp.copy(col_beg, row_beg + self._fh,
+                        col_end, row_end,
+                        col_beg, row_beg)
+        self._disp.clear(col_beg, row_end - self._fh + 1,
+                         col_end, row_end)
+
+    def putc(self, c):
+        if c == '\n':
+            self._linefeed = True
+            return
+        if self._ccol == self._ncol:
+            self._linefeed = True
+        if self._linefeed:
+            self._linefeed = False
+            self._ccol = 0
+            self._crow += 1
+            if self._crow == self._nrow:
+                self.scrollup()
+                self._crow -= 1
+        col_beg, row_beg, col_end, row_end = self._area
+        col = col_beg + self._ccol * self._fw
+        row = row_beg + self._crow * self._fh
+        self._disp.fcf_put(col, row, c, self._ch_spacing)
+        self._ccol += 1
+
+    def putline(self, msg):
+        for c in msg:
+            self.putc(c)
+        self.putc('\n')
+
+TextBoard(DummyAdaptor(), 0, 0, 32, 32)
