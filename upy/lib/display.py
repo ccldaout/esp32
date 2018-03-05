@@ -34,20 +34,22 @@ class Color(object):
 
 class _FontBase(object):
 
-    WIDTH = 6
-    HEIGHT = 13
+    FONTDIR = 'fonts/'
     FONTNUM = 128
     PIXELSIZE_b = 2
 
 class FixedColorFont(_FontBase):
 
-    FONTFILE = 'fonts/mplus-65k-13x6.fcf'
-
-    def __init__(self):
-        self._fontunit_b = self.WIDTH * self.HEIGHT * self.PIXELSIZE_b
-        size = self._fontunit_b * self.FONTNUM
-        self._fontarray = memoryview(array.array('B', range(size)))
-        with open(self.FONTFILE, 'rb') as f:
+    def __init__(self, fontfile='misaki_7x4.fcf'):
+        path = self.FONTDIR + fontfile
+        with open(path, 'rb') as f:
+            wh = array.array('B', (0, 0))
+            f.readinto(wh)
+            self.WIDTH = wh[0]
+            self.HEIGHT = wh[1]
+            self._fontunit_b = self.WIDTH * self.HEIGHT * self.PIXELSIZE_b
+            size = self._fontunit_b * self.FONTNUM
+            self._fontarray = memoryview(array.array('B', range(size)))
             f.readinto(self._fontarray)
 
     def change_color(self, fg_pixel, bg_pixel):
@@ -66,11 +68,14 @@ class FixedColorFont(_FontBase):
 
 class GraphicCompositFont(_FontBase):
 
-    FONTFILE = 'fonts/mplus-13x6.gcf'
-
-    def __init__(self):
-        self._index = array.array('H', range(self.FONTNUM + 1))
-        with open(self.FONTFILE, 'rb') as f:
+    def __init__(self, fontfile='mplus-10x5.gcf'):
+        path = self.FONTDIR + fontfile
+        with open(path, 'rb') as f:
+            wh = array.array('B', (0, 0))
+            f.readinto(wh)
+            self.WIDTH = wh[0]
+            self.HEIGHT = wh[1]
+            self._index = array.array('H', range(self.FONTNUM + 1))
             f.readinto(self._index)
             dsize = self._index[-1]
             self._data = memoryview(array.array('B', range(dsize)))

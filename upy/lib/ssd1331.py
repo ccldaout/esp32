@@ -489,9 +489,9 @@ class Adaptor(AdaptorBase):
                                            col_end, row_end,
                                            *listing())
 
-    def fcf_put(self, col, row, chars):
+    def fcf_put(self, col, row, chars, spacing=0):
         fcf = self._fcf
-        w = fcf.WIDTH
+        w = fcf.WIDTH + spacing
         h = fcf.HEIGHT
         pixels = fcf.pixels
 
@@ -507,9 +507,9 @@ class Adaptor(AdaptorBase):
             col += w
         return col
 
-    def gcf_put(self, col, row, chars, fg_color=None):
+    def gcf_put(self, col, row, chars, fg_color=None, spacing=0):
         gcf = self._gcf
-        w = gcf.WIDTH
+        w = gcf.WIDTH + spacing
 
         driver = self._driver
         get_line = gcf.get_line
