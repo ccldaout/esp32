@@ -68,7 +68,7 @@ class FixedColorFont(_FontBase):
 
 class GraphicCompositFont(_FontBase):
 
-    def __init__(self, fontfile='mplus-10x5.gcf'):
+    def __init__(self, fontfile='mplus_10x5.gcf'):
         path = self.FONTDIR + fontfile
         with open(path, 'rb') as f:
             wh = array.array('B', (0, 0))
