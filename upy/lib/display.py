@@ -119,9 +119,15 @@ class Image(object):
 
 class AdaptorBase(object):
 
-    def __new__(cls):
+    def __new__(cls, *, use_fcf, use_gcf):
         self = super().__new__(cls)
 
+        # fonts
+        if use_fcf:
+            self.fcf = FixedColorFont()
+        if use_gcf:
+            self.gcf = GraphicCompositFont()
+        
         # colors: public properties
         self.line_color = Color(0, 0, 0)	# RGB
         self.fill_color = Color(0, 0, 0)	# RGB
@@ -133,6 +139,18 @@ class AdaptorBase(object):
         self.Image = Image
 
         return self
+
+    @property
+    def display_size(self):
+        raise NotImplementedError()
+
+    @property
+    def fcf_size(self):
+        return (self.fcf.WIDTH, self.fcf.HEIGHT)
+
+    @property
+    def gcf_size(self):
+        return (self.gcf.WIDTH, self.gcf.HEIGHT)
 
     def fcf_change_color(self, fg_pixel, bg_pixel):
         raise NotImplementedError()

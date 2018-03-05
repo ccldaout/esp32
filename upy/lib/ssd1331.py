@@ -18,6 +18,9 @@ except:
 
 class SSD1331(object):
 
+    WIDTH = 96
+    HEIGHT = 64
+
     def __init__(self, *,
                  spi,
                  pinnum_cs,		# Chip Select
@@ -429,9 +432,9 @@ class Adaptor(AdaptorBase):
         if sys.implementation.name == 'micropython':
             # Whene super class is not object, super().__new__ seems to be
             # bound method in the MicroPython.
-            self = super().__new__()
+            self = super().__new__(use_fcf=fcf, use_gcf=gcf)
         else:
-            self = super().__new__(cls)
+            self = super().__new__(cls, use_fcf=fcf, use_gcf=gcf)
 
         self._driver = driver
 
@@ -440,20 +443,19 @@ class Adaptor(AdaptorBase):
         self.color_white = Color(*driver.rgb_max)
         self.gcf_fg_color = self.color_white
 
-        # fonts
-        if fcf:
-            self._fcf = FixedColorFont()
-        if gcf:
-            self._gcf = GraphicCompositFont()
-        
         # public methods
         self.pixel = driver.pixel
         self.clear = driver.clear
+        self.copy = driver.copy
 
         return self
 
+    @property
+    def display_size(self):
+        return (self._driver.WIDTH, self._driver.HEIGHT)
+
     def fcf_change_color(self, fg_pixel, bg_pixel):
-        return self._fcf.change_color(fg_pixel, bg_pixel)
+        return self.fcf.change_color(fg_pixel, bg_pixel)
 
     def draw_image(self, col, row, img):
         driver = self._driver
@@ -490,7 +492,7 @@ class Adaptor(AdaptorBase):
                                            *listing())
 
     def fcf_put(self, col, row, chars, spacing=0):
-        fcf = self._fcf
+        fcf = self.fcf
         w = fcf.WIDTH + spacing
         h = fcf.HEIGHT
         pixels = fcf.pixels
@@ -508,7 +510,7 @@ class Adaptor(AdaptorBase):
         return col
 
     def gcf_put(self, col, row, chars, fg_color=None, spacing=0):
-        gcf = self._gcf
+        gcf = self.gcf
         w = gcf.WIDTH + spacing
 
         driver = self._driver
