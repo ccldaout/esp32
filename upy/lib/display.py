@@ -49,7 +49,7 @@ class FixedColorFont(_FontBase):
             self.HEIGHT = wh[1]
             self._fontunit_b = self.WIDTH * self.HEIGHT * self.PIXELSIZE_b
             size = self._fontunit_b * self.FONTNUM
-            self._fontarray = memoryview(array.array('B', range(size)))
+            self._fontarray = memoryview(array.array('B', (0 for _ in range(size))))
             f.readinto(self._fontarray)
 
     def change_color(self, fg_pixel, bg_pixel):
@@ -78,7 +78,7 @@ class GraphicCompositFont(_FontBase):
             self._index = array.array('H', range(self.FONTNUM + 1))
             f.readinto(self._index)
             dsize = self._index[-1]
-            self._data = memoryview(array.array('B', range(dsize)))
+            self._data = memoryview(array.array('B', (0 for _ in range(dsize))))
             f.readinto(self._data)
 
     def get_line(self, c):
