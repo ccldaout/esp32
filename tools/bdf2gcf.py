@@ -1,41 +1,36 @@
 import sys
 import array
 
-COLORS = (array.array('B', (0, 0)),
-          array.array('B', (0xff, 0xff)))
-
-class Bitmap6x13(object):
-    WIDTH = 6
-    HEIGHT = 13
+class BitmapWxH(object):
     BIT_YET = 0
     BIT_SET = 1
     BIT_DONT = -1
 
     def __init__(self):
         self.map = [array.array('b', (self.BIT_DONT for _ in range(6)))
-                    for _ in range(self.HEIGHT)]
+                    for _ in range(FONT_HEIGHT)]
         self._row = 0
 
     def set_row(self, val):
-        if self._row >= self.HEIGHT:
+        if self._row >= FONT_HEIGHT:
             return
         row = self.map[self._row]
-        for i in range(self.WIDTH):
+        for i in range(FONT_WIDTH):
             if val & (1<<i):
-                row[self.WIDTH-i-1] = self.BIT_YET
+                row[FONT_WIDTH-i-1] = self.BIT_YET
         self._row += 1
             
     def scan(self):
         hm = (0, -1, -1, -1)	# max-chg, row, col_beg, col_end
-        for r in range(self.HEIGHT):
+        for r in range(FONT_HEIGHT):
             # find 1st BIT_YET
-            for b in range(self.WIDTH):
+            for b in range(FONT_WIDTH):
                 if self.map[r][b] == self.BIT_YET:
                     break
             else:
                 continue
             chg = 0
-            for e in range(b, self.WIDTH):
+            for e in range(b, FONT_WIDTH):
                 if self.map[r][e] == self.BIT_YET:
                     chg += 1
                 elif self.map[r][e] == self.BIT_SET:
@@ -43,7 +38,7 @@ class Bitmap6x13(object):
                 else:
                     break
             else:
-                e = self.WIDTH
+                e = FONT_WIDTH
             e -= 1
             if chg > hm[0]:
                 hm = (chg, r, b, e)
@@ -51,15 +46,15 @@ class Bitmap6x13(object):
             return None
 
         vm = (0, -1, -1, -1)	# max-chg, col, row_beg, row_end
-        for c in range(self.WIDTH):
+        for c in range(FONT_WIDTH):
             # find 1st BIT_YET
-            for b in range(self.HEIGHT):
+            for b in range(FONT_HEIGHT):
                 if self.map[b][c] == self.BIT_YET:
                     break
             else:
                 continue
             chg = 0
-            for e in range(b, self.HEIGHT):
+            for e in range(b, FONT_HEIGHT):
                 if self.map[e][c] == self.BIT_YET:
                     chg += 1
                 elif self.map[e][c] == self.BIT_SET:
@@ -67,7 +62,7 @@ class Bitmap6x13(object):
                 else:
                     break
             else:
-                e = self.HEIGHT
+                e = FONT_HEIGHT
             e -= 1
             if chg > vm[0]:
                 vm = (chg, c, b, e)
@@ -83,34 +78,6 @@ class Bitmap6x13(object):
             self.map[r][i] = self.BIT_SET
         return (b_col, r, e_col, r)
 
-def get_bitmap(fobj):
-    while True:
-        s = fobj.readline().rstrip()
-        if len(s) == 2:
-            break
-        if not s:
-            return None
-
-    bm = Bitmap6x13()
-    while True:
-        b = int(s, 16) >> 2
-        bm.set_row(b)
-        s = fobj.readline().rstrip()
-        if len(s) != 2:
-            return bm
-        
-def scan_bdf(bdf, callback):
-    with open(bdf) as f:
-        c = 0
-        while True:
-            bitmap = get_bitmap(f)
-            if not bitmap:
-                break
-            callback(c, bitmap)
-            c += 1
-            if c == 128:
-                return
-
 #index:
 # offset:0..(16bit) 
 #font
@@ -121,13 +88,11 @@ def scan_bdf(bdf, callback):
 
 class FontFile(object):
     def __init__(self):
-        self._index = array.array('H')
+        self._index = array.array('H', (0 for _ in range(FONT_CNT+1)))
         self._data = array.array('B')
-        self._frow = 0
 
-    def font_beg(self):
-        self._frow = 0
-        self._index.append(len(self._data))
+    def font_beg(self, code):
+        self._index[code] = len(self._data)
 
     def font_map(self, bitmap):
         while True:
@@ -140,19 +105,89 @@ class FontFile(object):
     def font_end(self):
         pass
 
-    def font(self, c_ord, bitmap):
-        self.font_beg()
-        self.font_map(bitmap)
+    def font(self, code, bitmap):
+        bm = BitmapWxH()
+        for b in bitmap:
+            bm.set_row(b)
+        self.font_beg(code)
+        self.font_map(bm)
         self.font_end()
 
     def save(self, path):
-        self._index.append(len(self._data))
+        self._index[FONT_CNT] = len(self._data)
         with open(path, 'wb') as f:
+            f.write(array.array('B', (FONT_WIDTH, FONT_HEIGHT)))
             f.write(self._index)
             f.write(self._data)
 
-IN_FILE = 'mplus_f12r.bdf'
-OUT_FILE = '../fonts/mplus-13x6.gcf'
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+
+def get_bitmap(fobj):
+    v = []
+    while True:
+        s = fobj.readline().rstrip()
+        if s[:9] == 'ENCODING ':
+            code = int(s.split()[1])
+            if 0x20 <= code < 128:
+                break
+        if not s:
+            return None, None
+    while True:
+        s = fobj.readline().rstrip()
+        if len(s) == 2:
+            break
+        if not s:
+            return None, None
+    while True:
+        b = int(s, 16) >> BITSHIFT
+        v.append(b)
+        s = fobj.readline().rstrip()
+        if len(s) != 2:
+            return code, v
+        
+def scan_bdf(bdf, callback):
+    with open(bdf) as f:
+        while True:
+            code, bitmap = get_bitmap(f)
+            if not bitmap:
+                break
+            callback(code, bitmap[ROW_BEG:ROW_END])
+
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+
+font_type = int(sys.argv[1])
+
+if font_type == 1:	# 4x7
+    IN_FILE = 'misaki_4x8_iso8859.bdf'
+    OUT_FILE = '../fonts/misaki_7x4.gcf'
+    FONT_WIDTH = 4
+    ROW_BEG = 0
+    ROW_END = 7
+elif font_type == 2:	# 5x10
+    IN_FILE = 'mplus_f10r.bdf'
+    OUT_FILE = '../fonts/mplus_10x5.gcf'
+    FONT_WIDTH = 5
+    ROW_BEG = 1
+    ROW_END = 11
+elif font_type == 3:	# 5x12
+    IN_FILE = 'mplus_f12r.bdf'
+    OUT_FILE = '../fonts/mplus_12x5.gcf'
+    FONT_WIDTH = 5
+    ROW_BEG = 1
+    ROW_END = 13
+
+#COLORS = (array.array('B', (0, 0)),
+#          array.array('B', (0xff, 0xff)))
+
+#PIXEL_SIZE = len(COLORS[0])
+FONT_CNT = 128	# 0..127
+FONT_HEIGHT = ROW_END - ROW_BEG
+#FONT_SIZE = FONT_WIDTH * FONT_HEIGHT * PIXEL_SIZE
+
+BITSHIFT = 8 - FONT_WIDTH
+BITFORM = '{:0%db}' % FONT_WIDTH
 
 fontfile = FontFile()
 scan_bdf(IN_FILE, fontfile.font)

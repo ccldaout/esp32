@@ -1,14 +1,10 @@
 import sys
 import array
 
-def save(code, bitmap, fontimg):
-    boff = FONT_SIZE * code
-    eoff = boff + PIXEL_SIZE
-    for bitstr in bitmap:
-        for c in bitstr:
-            fontimg[boff:eoff] = COLORS[c == '1']
-            boff += PIXEL_SIZE
-            eoff += PIXEL_SIZE
+def show(code, bitmap):
+    print ('[ %c (%d) ]' % (code, code)).center(20, '-')
+    for bits in bitmap:
+        print bits.replace('0', '.').replace('1', '#')
 
 #----------------------------------------------------------------------------
 #----------------------------------------------------------------------------
@@ -68,22 +64,10 @@ elif font_type == 3:	# 5x12
     ROW_BEG = 1
     ROW_END = 13
 
-COLORS = (array.array('B', (0, 0)),
-          array.array('B', (0xff, 0xff)))
-
-PIXEL_SIZE = len(COLORS[0])
 FONT_CNT = 128	# 0..127
 FONT_HEIGHT = ROW_END - ROW_BEG
-FONT_SIZE = FONT_WIDTH * FONT_HEIGHT * PIXEL_SIZE
-
 
 BITSHIFT = 8 - FONT_WIDTH
 BITFORM = '{:0%db}' % FONT_WIDTH
 
-fontimg = array.array('B', (0 for _ in range(FONT_SIZE * FONT_CNT)))
-
-scan_bdf(IN_FILE, lambda c, bitmap: save(c, bitmap, fontimg))
-
-with open(OUT_FILE, 'wb') as f:
-    f.write(array.array('B', (FONT_WIDTH, FONT_HEIGHT)))
-    f.write(fontimg)
+scan_bdf(IN_FILE, show)
