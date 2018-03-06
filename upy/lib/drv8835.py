@@ -48,3 +48,16 @@ class DRV8835(object):
         else:
             self._b_phase.value(1)
             self._b_pwm.duty(int(self.PWM_MAX_DUTY * -duty))
+            
+    def phen_raw_a_duty(self, duty):
+        self._a_pwm.duty(duty)
+        
+    def phen_raw_a_dir(self, value):
+        self._a_phase.value(value)
+
+    def phen_raw_b_duty(self, duty):
+        self._b_pwm.duty(duty)
+        
+    def phen_raw_b_dir(self, value):
+        self._b_phase.value(value)
+

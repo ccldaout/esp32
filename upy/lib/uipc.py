@@ -51,7 +51,9 @@ class IOPort(object):
         return z
 
     def close(self):
-        self.socket.close()
+        if self.socket:
+            self.socket.close()
+            self.socket = None
 
     def __getattr__(self, name):
         def _send(*args):
@@ -80,10 +82,10 @@ class ServiceBase(object):
         pass
 
     def on_disconnected(self, port):
-        port.close()
+        pass
 
     def on_exception(self, port):
-        port.close()
+        pass
 
     def on_default(self, port, msg):
         raise NotImplementedError(msg[0])
@@ -133,8 +135,10 @@ class _ServiceManager(object):
                 except SocketClosedByPeer:
                     self.unregister(port)
                     service_object.on_disconnected(port)
+                    port.close()
                 except:
                     self.unregister(port)
                     service_object.on_exception(port)
+                    port.close()
 
 manager = _ServiceManager()
