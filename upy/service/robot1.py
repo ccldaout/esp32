@@ -1,5 +1,7 @@
 import os
 import machine
+import time
+
 import uipc
 import drv8835
 from config import robot as config
@@ -34,6 +36,7 @@ class RobotService(uipc.ServiceBase):
         _, a_duty, b_duty = msg
         self._drv.duty_a(a_duty)
         self._drv.duty_b(b_duty)
+        time.sleep_ms(50)
 
 def register(port):
     uipc.manager.register_server(port, RobotService())

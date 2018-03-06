@@ -7,6 +7,10 @@ class Config(object):
             return default
         return getattr(self, name)
 
+# Wi-Fi
+wifi = Config()
+wifi.services = [('admin', 2000), ('robot1', 2001)]
+
 # my own SSD1331
 ssd1331 = Config()
 ssd1331.split_COM_odd_even = True	# BUG on chip

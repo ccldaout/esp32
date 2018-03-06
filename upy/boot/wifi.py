@@ -4,7 +4,9 @@ import _thread
 import ssd1331
 import uipc
 import uwifi
-import service.admin
+import service
+
+from config import wifi as config
 
         
 class WifiProgressSSD1331(uwifi.WifiProgressBase):
@@ -92,6 +94,10 @@ def start_wifi():
         wifi.start_ap_mode()
     if wifi.ip_address:
         uipc.manager.ip_address = wifi.ip_address
-        service.admin.register(2000)
+        for svcname, portnum in config.services:
+            svcmod = __import__('service.'+svcname)
+            mod = getattr(svcmod, svcname)
+            register = getattr(mod, 'register')
+            register(portnum)
 
 _thread.start_new_thread(start_wifi, ())

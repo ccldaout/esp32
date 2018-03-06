@@ -11,14 +11,17 @@ class DRV8835(object):
         if mode == self.MODE_IN_IN:
             raise NotImplementedError()
         else:
+            pinout = machine.Pin.OUT
             if a_in1 is not None:
-                self._a_phase = machine.Pin(a_in1)
-                self._a_enable = machine.Pin(a_in2)
+                self._a_phase = machine.Pin(a_in1, pinout)
+                self._a_phase.value(0)
+                self._a_enable = machine.Pin(a_in2, pinout)
                 self._a_pwm = machine.PWM(self._a_enable,
                                           freq=self.PWM_MAX_FREQ, duty=0)
             if b_in1 is not None:
-                self._b_phase = machine.Pin(b_in1)
-                self._b_enable = machine.Pin(b_in2)
+                self._b_phase = machine.Pin(b_in1, pinout)
+                self._b_phase.value(0)
+                self._b_enable = machine.Pin(b_in2, pinout)
                 self._b_pwm = machine.PWM(self._b_enable,
                                           freq=self.PWM_MAX_FREQ, duty=0)
             self.duty_a = self.phen_duty_a
