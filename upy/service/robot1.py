@@ -30,7 +30,8 @@ class RobotService(uipc.ServiceBase):
         self._logger('drv8835 is enabled.')
 
     @autoreply
-    def duty(self, a_duty, b_duty):
+    def duty(self, port, msg):
+        _, a_duty, b_duty = msg
         self._drv.duty_a(a_duty)
         self._drv.duty_b(b_duty)
 
