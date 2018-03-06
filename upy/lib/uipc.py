@@ -74,6 +74,11 @@ class AcceptablePort(object):
         iosocket, _ = self.socket.accept()
         return IOPort(iosocket)
 
+    def close(self):
+        if self.socket:
+            self.socket.close()
+            self.socket = None
+
 class ServiceBase(object):
     def __call__(self, port):
         return self
@@ -116,29 +121,35 @@ class _ServiceManager(object):
 
     def unregister(self, port):
         self._poll.unregister(port.socket)
-        del self._ports[port.socket.fileno()]
+        if port.socket.fileno() in self._ports:
+            del self._ports[port.socket.fileno()]
 
     def loop(self):
         while True:
             for sensed in self._poll.ipoll():
                 sock = sensed[0]
                 port, service_object = self._ports[sock.fileno()]
-                try:
-                    if port.acceptable:
+                if port.acceptable:
+                    newport = None
+                    try:
                         newport = port.accept()
                         service_object = service_object(port)
                         self.register(newport, service_object)
                         service_object.on_accepted(newport)
-                    else:
+                    except:
+                        if newport:
+                            self.unregister(newport)
+                else:
+                    try:
                         msg = port.recv()
                         service_object.on_received(port, msg)
-                except SocketClosedByPeer:
-                    self.unregister(port)
-                    service_object.on_disconnected(port)
-                    port.close()
-                except:
-                    self.unregister(port)
-                    service_object.on_exception(port)
-                    port.close()
+                    except SocketClosedByPeer:
+                        self.unregister(port)
+                        service_object.on_disconnected(port)
+                        port.close()
+                    except:
+                        self.unregister(port)
+                        service_object.on_exception(port)
+                        port.close()
 
 manager = _ServiceManager()

@@ -15,6 +15,7 @@ def autoreply(f):
         except Exception as e:
             print(msg, '... failed:', e)
             port.failure(str(e))
+            raise
     return _f
 
 class RobotService(uipc.ServiceBase):
@@ -26,7 +27,7 @@ class RobotService(uipc.ServiceBase):
         self._enabled = False
 
     def on_accepted(self, port):
-        self._loggoer('on_accepted')
+        self._logger('on_accepted')
 
     def on_disconnected(self, port):
         self._logger('on_disconnected')
