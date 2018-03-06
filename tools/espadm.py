@@ -14,9 +14,11 @@ if len(sys.argv) == 1:
     exit()
 
 def show_result(f):
-    def _f(self, path):
-        ret = f(self, path)
-        print path, '...', ret
+    def _f(self, *args):
+        ret = f(self, *args)
+        if len(args) == 1:
+            args = args[0]
+        print args, '...', ret
         return ret
     return _f
 
@@ -63,6 +65,10 @@ class AdminCommand(object):
     def mkdir(self, path):
         return self._send(['mkdir', path])
 
+    @show_result
+    def service(self, modname, portnum):
+        return self._send(['service', modname, portnum])
+
     def reset(self):
         self.cli.send(['reset'])
         self.stop()
@@ -84,3 +90,6 @@ elif sys.argv[1] == 'putsmall':
 elif sys.argv[1] == 'mkdir':
     for path in sys.argv[2:]:
         admin.mkdir(path)
+
+elif sys.argv[1] == 'service':
+    admin.service(sys.argv[2], int(sys.argv[3]))

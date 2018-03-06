@@ -82,5 +82,7 @@ class WifiNetwork(object):
         self._progress.init_ap_mode()
         wifi.active(True)
         self._progress.actived()
+        ssid = wifi.config('essid')
+        self._progress.connecting(ssid)
         self.ip_address = wifi.ifconfig()[0]
         self._progress.ip_address(self.ip_address)

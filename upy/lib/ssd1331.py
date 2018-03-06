@@ -3,13 +3,8 @@ import machine
 import spi
 import sys
 import time
-
 from display import *
-try:
-    import config
-    config = config.ssd1331
-except:
-    from configobj import empty_config as config
+from config import ssd1331 as config
 
 
 #----------------------------------------------------------------------------
@@ -411,7 +406,11 @@ class SSD1331(object):
     def color_65k(self):
         self.set_remap_and_color_depth(color_format=1)
 
-def vspi(pinnum_dc=16, pinnum_rst=4):
+def vspi(pinnum_dc=None, pinnum_rst=None):
+    if pinnum_dc is None:
+        pinnum_dc = config.pin_dc
+    if pinnum_rst is None:
+        pinnum_rst = config.pin_rst
     vspi = spi.SPI(spi.ID_VSPI, polarity=1, phase=1)
     pinnum_cs = vspi.ss_number
     disp = SSD1331(spi=vspi,

@@ -4,7 +4,7 @@ import _thread
 import ssd1331
 import uipc
 import uwifi
-import admin
+import service.admin
 
         
 class WifiProgressSSD1331(uwifi.WifiProgressBase):
@@ -64,6 +64,8 @@ class WifiProgressSSD1331(uwifi.WifiProgressBase):
         self._mode = 'ST'
 
     def init_ap_mode(self):
+        d = self._disp
+        d.draw_rect(19, 2, 93, 11, self._top_bg, self._top_bg)
         self._mode = 'AP'
 
     def actived(self):
@@ -90,6 +92,6 @@ def start_wifi():
         wifi.start_ap_mode()
     if wifi.ip_address:
         uipc.manager.ip_address = wifi.ip_address
-        uipc.manager.register_server(2000, admin.AdminService())
+        service.admin.register(2000)
 
 _thread.start_new_thread(start_wifi, ())

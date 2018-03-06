@@ -1,4 +1,4 @@
 try:
-    import boot_wifi
+    import boot.wifi
 except:
     pass

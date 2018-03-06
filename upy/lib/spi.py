@@ -16,7 +16,11 @@ HSPI_SS = 15
 
 class SPI(object):
 
-    def __init__(self, id,
+    HSPI = None
+    VSPI = None
+    SOFT_SPI = None
+
+    def __new__(cls, id,
                  *,
                  polarity,
                  phase,
@@ -25,15 +29,24 @@ class SPI(object):
                  sck=None,
                  bits=8,
                  baudrate = 6*1000*1000):	# 6MHz
+
         if id == ID_HSPI:
+            if cls.HSPI:
+                return cls.HSPI
             mosi, miso, sck, ss = HSPI_MOSI, HSPI_MISO, HSPI_SCK, HSPI_SS
         elif id == ID_VSPI:
+            if cls.VSPI:
+                return cls.VSPI
             mosi, miso, sck, ss = VSPI_MOSI, VSPI_MISO, VSPI_SCK, VSPI_SS
         elif id == ID_SOFT:
+            if cls.SOFT_SPI:
+                return cls.SOFT_SPI
             ss = None
         else:
             raise TypeError('invalid id')
             
+        self = super().__new__(cls)
+
         self.mosi = machine.Pin(mosi, machine.Pin.OUT)
         self.miso = machine.Pin(miso, machine.Pin.IN)
         self.sck  = machine.Pin(sck,  machine.Pin.OUT)
@@ -59,3 +72,12 @@ class SPI(object):
                                      bits=bits)
             self.__spi.init(mosi=self.mosi, miso=self.miso, sck=self.sck)
         self.write = self.__spi.write
+
+        if id == ID_HSPI:
+            type(self).HSPI = self
+        elif id == ID_VSPI:
+            type(self).VSPI = self
+        elif id == ID_SOFT:
+            type(self).SOFT_SPI = self
+
+        return self
