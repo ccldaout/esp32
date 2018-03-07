@@ -114,3 +114,6 @@ elif sys.argv[1] == 'rename':
 
 elif sys.argv[1] == 'service':
     admin.service(sys.argv[2], int(sys.argv[3]))
+
+else:
+    print 'Unknown command:', sys.argv[1]
