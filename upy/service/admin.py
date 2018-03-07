@@ -5,16 +5,7 @@ import machine
 import uipc
 
 
-def autoreply(f):
-    def _f(self, port, msg):
-        try:
-            ret = f(self, port, msg)
-            port.success(ret)
-        except Exception as e:
-            print(msg, '... failed:', e)
-            port.failure(str(e))
-    return _f
-
+@uipc.autoreply
 class AdminService(uipc.ServiceBase):
 
     def __init__(self):
@@ -24,53 +15,48 @@ class AdminService(uipc.ServiceBase):
     def reset(self, port, msg):
         machine.reset()
 
-    @autoreply
-    def put(self, port, msg):
-        _, path, data = msg
+    @uipc.autoreply
+    def put(self, path, data):
         data = binascii.unhexlify(data)
         with open(path, 'wb') as f:
             f.write(data)
         print(path, '... updated.')
 
-    @autoreply
-    def put_beg(self, port, msg):
-        _, self._path = msg
+    @uipc.autoreply
+    def put_beg(self, path):
+        self._path = path
         self._fobj = open(self._path, 'wb')
         print('put', self._path, 'begin')
 
-    @autoreply
-    def put_data(self, port, msg):
-        _, data = msg
+    @uipc.autoreply
+    def put_data(self, data):
         data = binascii.unhexlify(data)
         self._fobj.write(data)
         print('put', self._path, 'data')
 
-    @autoreply
-    def put_end(self, port, msg):
+    @uipc.autoreply
+    def put_end(self):
         self._fobj.close()
         print('put', self._path, 'end')
         self._logger('%s ... OK' % self._path)
         self._fobj = None
         self._path = None
 
-    @autoreply
-    def mkdir(self, port, msg):
-        _, path = msg
+    @uipc.autoreply
+    def mkdir(self, path):
         os.mkdir(path)
         self._logger('%s ... OK' % path)
 
-    @autoreply
-    def service(self, port, msg):
-        _, modname, portnum = msg
+    @uipc.autoreply
+    def service(self, modname, portnum):
         svc = __import__('service.' + modname)
         m = getattr(svc, modname)
         f = getattr(m, 'register')
         f(portnum)
         self._logger('%s ... registered' % modname)
 
-    @autoreply
-    def demo(self, port, msg):
-        _, modname, args, kwargs = msg
+    @uipc.autoreply
+    def demo(self, modname, args, kwargs):
         if args is None:
             args = ()
         if kwargs is None:
