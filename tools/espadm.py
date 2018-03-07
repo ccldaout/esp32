@@ -43,8 +43,34 @@ class AdminCommand(object):
                 self.cli.put_data(data)
             self.cli.put_end()
 
+    def get(self, path):
+        with open(path+'.tmp', 'rb') as f:
+            self.cli.get_beg(path)
+            while True:
+                data = self.cli.get_data()
+                if not data:
+                    break
+                data = binascii.unhexlify(data)
+                f.write(data)
+        if os.path.exists(path):
+            os.rename(path, path+'.bck')
+        ps.rename(path+'.tmp', path)
+
     def mkdir(self, path):
         self.cli.mkdir(path)
+
+    def rmdir(self, path):
+        self.cli.rmdir(path)
+
+    def ls(self, path):
+        print path
+        print ' ', self.cli.ls(path)
+
+    def remove(self, path):
+        self.cli.remove(path)
+
+    def rename(self, source, target):
+        self.cli.rename(source, target)
 
     def service(self, modname, portnum):
         self.cli.service(modname, portnum)
@@ -70,6 +96,21 @@ elif sys.argv[1] == 'putsmall':
 elif sys.argv[1] == 'mkdir':
     for path in sys.argv[2:]:
         admin.mkdir(path)
+
+elif sys.argv[1] == 'rmdir':
+    for path in sys.argv[2:]:
+        admin.rmdir(path)
+    
+elif sys.argv[1] == 'ls':
+    for path in sys.argv[2:]:
+        admin.ls(path)
+
+elif sys.argv[1] == 'remove':
+    for path in sys.argv[2:]:
+        admin.remove(path)
+
+elif sys.argv[1] == 'rename':
+    admin.rename(sys.argv[2], sys.argv[3])
 
 elif sys.argv[1] == 'service':
     admin.service(sys.argv[2], int(sys.argv[3]))

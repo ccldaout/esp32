@@ -43,6 +43,24 @@ class AdminService(uipc.ServiceBase):
         self._path = None
 
     @uipc.autoreply
+    def get_beg(self, path):
+        self._path = path
+        self._fobj = open(self._path, 'rb')
+        print('get', self._path, 'begin')
+
+    @uipc.autoreply
+    def get_data(self):
+        data = self._fobj.read(2048)
+        if data:
+            data = binascii.hexlify(data)
+        else:
+            self._fobj.close()
+            self._fobj = None
+            self._path = None
+        print('get', self._path, 'data')
+        return data
+
+    @uipc.autoreply
     def mkdir(self, path):
         os.mkdir(path)
         self._logger('mkdir %s' % path)
