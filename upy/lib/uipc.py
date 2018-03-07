@@ -199,6 +199,7 @@ class _AutoReply(object):
                     port.send([reply, True, ret])
                 except Exception as e:
                     port.send([reply, False, str(e)])
+                    sys.print_exception(e)
             self._autoreply_names.add(target.__name__)
             return wrapper
 
@@ -286,6 +287,7 @@ class _ServiceManager(object):
                         self.register(newport, service_object)
                         service_object.on_accepted(newport)
                     except Exception as e:
+                        sys.print_exception(e)
                         if newport:
                             self.unregister(newport)
                             newport.close()
@@ -293,11 +295,13 @@ class _ServiceManager(object):
                     try:
                         msg = port.recv()
                         service_object.on_received(port, msg)
-                    except SocketClosedByPeer:
+                    except SocketClosedByPeer as e:
+                        sys.print_exception(e)
                         self.unregister(port)
                         service_object.on_disconnected(port)
                         port.close()
-                    except:
+                    except as e:
+                        sys.print_exception(e)
                         self.unregister(port)
                         service_object.on_exception(port)
                         port.close()
