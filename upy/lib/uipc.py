@@ -300,7 +300,7 @@ class _ServiceManager(object):
                         self.unregister(port)
                         service_object.on_disconnected(port)
                         port.close()
-                    except as e:
+                    except Exception as e:
                         sys.print_exception(e)
                         self.unregister(port)
                         service_object.on_exception(port)

@@ -13,6 +13,7 @@ class AdminService(uipc.ServiceBase):
         self._logger = text_board.putline
 
     def reset(self, port, msg):
+        import boot.ena
         machine.reset()
 
     @uipc.autoreply
@@ -72,7 +73,7 @@ class AdminService(uipc.ServiceBase):
 
     @uipc.autoreply
     def ls(self, path):
-        lis = os.lisdir(path)
+        lis = os.listdir(path)
         self._logger('ls %s' % path)
         return lis
 
