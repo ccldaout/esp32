@@ -45,7 +45,28 @@ class AdminService(uipc.ServiceBase):
     @uipc.autoreply
     def mkdir(self, path):
         os.mkdir(path)
-        self._logger('%s ... OK' % path)
+        self._logger('mkdir %s' % path)
+
+    @uipc.autoreply
+    def rmdir(self, path):
+        os.rmdir(path)
+        self._logger('rmdir %s' % path)
+
+    @uipc.autoreply
+    def ls(self, path):
+        lis = os.lisdir(path)
+        self._logger('ls %s' % path)
+        return lis
+
+    @uipc.autoreply
+    def remove(self, path):
+        os.remove(path)
+        self._logger('remove %s' % path)
+
+    @uipc.autoreply
+    def rename(self, path, path2):
+        os.rename(path, path2)
+        self._logger('remove %s' % path)
 
     @uipc.autoreply
     def service(self, modname, portnum):
