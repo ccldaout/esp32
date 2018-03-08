@@ -1,12 +1,12 @@
-import json
+# -*- coding: utf-8 -*-
+
 import socket
-import select
 import struct
 import sys
 
 
 #----------------------------------------------------------------------------
-#
+#                        machine dependent functions
 #----------------------------------------------------------------------------
 
 #### thread
@@ -19,18 +19,16 @@ def _thread_getlock():
     return _thread.allocate_lock()
 
 #### poll
-_POLL_IN = select.POLLIN
-
-def _poll_create():
-    return select.poll()
-
-def _poll_poller(pollobj):
-    return pollobj.ipoll
+import select as upoll
 
 #### socket.read
 def _recvall(sock, n):
     return sock.read(n)
         
+#### print exception
+def _print_exception(e):
+    sys.print_exception(e)
+
 
 #----------------------------------------------------------------------------
 #
@@ -39,7 +37,10 @@ def _recvall(sock, n):
 class PortError(Exception):
     pass
 
-class SocketClosedByPeer(PortError):
+class SocketClosed(PortError):
+    pass
+
+class SocketUnexpectedClosed(PortError):
     pass
 
 class SocketIOError(PortError):
@@ -75,23 +76,18 @@ class DumpPackerBase(object):
 
     def unpack(self, sock):
         size_str = _recvall(sock, 4)
+        if not size_str:
+            raise SocketClosed()
         if len(size_str) != 4:
-            raise SocketClosedByPeer()
+            raise SocketUnexpectedClosed()
         n, = struct.unpack('<i', size_str)
         data = _recvall(sock, n)
         if len(data) != n:
-            raise SocketClosedByPeer()
+            raise SocketUnexpectedClosed()
         return self.loads(data)
 
-try:
-    import cPickle
-    class PyPacker(DumpPackerBase):
-        dumps = staticmethod(lambda msg: cPickle.dumps(msg, cPickle.HIGHEST_PROTOCOL))
-        loads = staticmethod(cPickle.loads)
-except:
-    pass
-
 class JSONPacker(DumpPackerBase):
+    import json
     dumps = staticmethod(json.dumps)
     loads = staticmethod(json.loads)
 
@@ -199,7 +195,7 @@ class _AutoReply(object):
                     port.send([reply, True, ret])
                 except Exception as e:
                     port.send([reply, False, str(e)])
-                    sys.print_exception(e)
+                    _print_exception(e)
             self._autoreply_names.add(target.__name__)
             return wrapper
 
@@ -251,9 +247,9 @@ class ServiceBase(object):
 
 class _ServiceManager(object):
     def __init__(self):
-        self._poll = _poll_create()
+        self._poll = upoll.poll()
         self._ports = {}
-        self.ip_address = None
+        self.ip_address = ''
         _thread_start(self.loop, ())
 
     def register_server(self, addr, service_object):
@@ -264,20 +260,19 @@ class _ServiceManager(object):
 
     def register(self, port, service_object):
         fd = port.socket.fileno()
-        self._poll.register(port.socket, _POLL_IN)	# MicroPython
+        self._poll.register(port.socket, upoll.POLLIN)
         self._ports[fd] = (port, service_object)
 
     def unregister(self, port):
         fd = port.socket.fileno()
-        self._poll.unregister(port.socket)		# MicroPython
+        self._poll.unregister(port.socket)
         if fd in self._ports:
             del self._ports[fd]
 
     def loop(self):
-        poller = _poll_poller(self._poll)
         while True:
-            for sensed in poller():
-                fd = sensed[0].fileno()			# MicroPython
+            for fobj, flag in self._poll.ipoll():
+                fd = fobj.fileno()
                 port, service_object = self._ports[fd]
                 if port.acceptable:
                     newport = None
@@ -287,7 +282,7 @@ class _ServiceManager(object):
                         self.register(newport, service_object)
                         service_object.on_accepted(newport)
                     except Exception as e:
-                        sys.print_exception(e)
+                        _print_exception(e)
                         if newport:
                             self.unregister(newport)
                             newport.close()
@@ -295,13 +290,12 @@ class _ServiceManager(object):
                     try:
                         msg = port.recv()
                         service_object.on_received(port, msg)
-                    except SocketClosedByPeer as e:
-                        sys.print_exception(e)
+                    except SocketClosed as e:
                         self.unregister(port)
                         service_object.on_disconnected(port)
                         port.close()
                     except Exception as e:
-                        sys.print_exception(e)
+                        _print_exception(e)
                         self.unregister(port)
                         service_object.on_exception(port)
                         port.close()
