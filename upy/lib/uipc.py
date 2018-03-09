@@ -116,7 +116,7 @@ class IOPort(object):
         return self				# for method chain
 
     def negotiate(self):
-        self._autoreply_names = set(self.send(['on_negotiate']).result())
+        self._autoreply_names = set(self.send(['uipc_negotiate']).result())
         return self				# for method chain
 
     def recv(self):
@@ -226,6 +226,23 @@ class ServiceBase(object):
     def __call__(self, port):
         return self
 
+    # uipc_ prefixed methods are reserved for internal.
+
+    def uipc_negotiate(self, port, msg):
+        port.send(['uipc_negotiate_reply', True, list(self._autoreply_names)])
+
+    def uipc_received(self, port, msg):
+        name = msg[0]
+        if hasattr(self, name):
+            getattr(self, name)(port, msg)
+        else:
+            self.on_default(port, msg)
+
+    # on_ prefixed methods are overridable.
+
+    def on_default(self, port, msg):
+        raise NotImplementedError(msg[0])
+
     def on_accepted(self, port):
         pass
 
@@ -235,24 +252,11 @@ class ServiceBase(object):
     def on_exception(self, port):
         pass
 
-    def on_negotiate(self, port, msg):
-        port.send(['on_negotiate_reply', True, list(self._autoreply_names)])
-
-    def on_default(self, port, msg):
-        raise NotImplementedError(msg[0])
-
-    def on_received(self, port, msg):
-        name = msg[0]
-        if hasattr(self, name):
-            getattr(self, name)(port, msg)
-        else:
-            self.on_default(port, msg)
-
 class _ServiceManager(object):
     def __init__(self):
         self._poll = upoll.poll()
         self._ports = {}
-        self.ip_address = ''
+        self.ip_address = '0.0.0.0'
         _thread_start(self.loop, ())
 
     def register_server(self, addr, service_object, packer=None):
@@ -292,7 +296,7 @@ class _ServiceManager(object):
                 else:
                     try:
                         msg = port.recv()
-                        service_object.on_received(port, msg)
+                        service_object.uipc_received(port, msg)
                     except SocketClosed as e:
                         self.unregister(port)
                         service_object.on_disconnected(port)
