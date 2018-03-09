@@ -60,7 +60,7 @@ class PackerBase(object):
     def __call__(self):
         return self
 
-class DumpPackerBase(object):
+class DumpPackerBase(PackerBase):
     @staticmethod
     def dumps(msg):
         raise NotImplementedError()
@@ -154,19 +154,22 @@ class IOPort(object):
         return _send
 
 def client(addr, packer=None):
-    return IOPort(packer).connect(addr).negotiate()
+    return IOPort(packer=packer).connect(addr).negotiate()
 
 class AcceptablePort(object):
     acceptable = True
 
-    def __init__(self, sock_addr):
+    def __init__(self, sock_addr, packer=None):
         self.socket = socket.socket()
         self.socket.bind(sock_addr)
         self.socket.listen(1)
+        self._packer = packer
 
     def accept(self):
         iosocket, _ = self.socket.accept()
-        return IOPort(iosocket)
+        packer = self._packer
+        return IOPort(sock=iosocket,
+                      packer=(packer() if packer else None))
 
     def close(self):
         if self.socket:
@@ -252,10 +255,10 @@ class _ServiceManager(object):
         self.ip_address = ''
         _thread_start(self.loop, ())
 
-    def register_server(self, addr, service_object):
+    def register_server(self, addr, service_object, packer=None):
         if isinstance(addr, int):
             addr = (self.ip_address, addr)
-        port = AcceptablePort(addr)
+        port = AcceptablePort(addr, packer=packer)
         self.register(port, service_object)
 
     def register(self, port, service_object):
