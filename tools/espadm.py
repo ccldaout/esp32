@@ -54,7 +54,7 @@ class AdminCommand(object):
                 f.write(data)
         if os.path.exists(path):
             os.rename(path, path+'.bck')
-        ps.rename(path+'.tmp', path)
+        os.rename(path+'.tmp', path)
 
     def mkdir(self, path):
         self.cli.mkdir(path)
