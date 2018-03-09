@@ -93,7 +93,6 @@ def start_wifi():
     if not wifi.try_station_mode():
         wifi.start_ap_mode()
     if wifi.ip_address:
-        uipc.manager.ip_address = wifi.ip_address
         for svcname, portnum in config.services:
             svcmod = __import__('service.'+svcname)
             mod = getattr(svcmod, svcname)
