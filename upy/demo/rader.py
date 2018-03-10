@@ -13,8 +13,8 @@ DISP_H = 64		# Display horizontal size
 DISP_W = 92		# Display vertical size
 
 TRIG_PIN = 32		# HCSR04: Trigger pin
-ECHO_PIN = 25		# HSCR04: Echo pin
-H_PIN_NUM = 27		# Mounter(SG90): pin of Horizontal motor
+ECHO_PIN = 35		# HSCR04: Echo pin
+H_PIN_NUM = 17		# Mounter(SG90): pin of Horizontal motor
 
 SENSOR_OFFSET_cm = 4.0
 

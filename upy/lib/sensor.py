@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import machine
 import time
 
@@ -19,3 +21,22 @@ class HCSR04(object):
             dist = float(self.coef_cm * us)
             return min(max(2.0, dist), 400.0)
         return None
+
+class QTRxRC(object):
+
+    def __init__(self, pinnum_list, *,
+                 duration_us=30,
+                 timeout_us=50):
+        self._pins = [machine.Pin(n) for n in pinnum_list]
+        self._duration_us = duration_us
+        self._timeout_us = timeout_us
+
+    def sense(self):
+        dur_us, tmo_us = self._duration_us, self._timeout_us
+        for pin in self._pins:
+            pin.init(machine.Pin.OUT, value=1)
+            time.sleep_us(dur_us)
+            pin.init(machine.Pin.IN)
+            us = machine.time_pulse_us(pin, 1, tmo_us)
+            pin.init(machine.Pin.OUT, value=0)
+            yield us

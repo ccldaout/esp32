@@ -12,8 +12,8 @@ class Mounter(object):
         self._hservo.angle(h_ang)
         self._vservo.angle(v_ang)
 
-H_PIN_NUM = 27
-V_PIN_NUM = 26
+H_PIN_NUM = 17
+V_PIN_NUM = 13
 
 mounter = Mounter(H_PIN_NUM, V_PIN_NUM)
 
