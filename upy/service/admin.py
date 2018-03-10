@@ -90,6 +90,16 @@ class AdminService(uipc.ServiceBase):
         self._logger('remove %s' % path)
 
     @uipc.autoreply
+    def display_on(self):
+        from display import display
+        display.display_on()
+
+    @uipc.autoreply
+    def display_off(self):
+        from display import display
+        display.display_off()
+
+    @uipc.autoreply
     def service(self, modname):
         svc = __import__('service.' + modname)
         m = getattr(svc, modname)
@@ -97,7 +107,7 @@ class AdminService(uipc.ServiceBase):
         portnum = f()
         self._logger('%s ... registered' % modname)
         return portnum
-
+        
 def register():
     uipc.manager.register_server(config.port, AdminService())
     return config.port

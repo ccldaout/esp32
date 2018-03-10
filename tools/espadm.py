@@ -68,6 +68,12 @@ class AdminCommand(object):
     def rename(self, source, target):
         self.cli.rename(source, target)
 
+    def display_on(self):
+        self.cli.display_on()
+
+    def display_off(self):
+        self.cli.display_off()
+
     def service(self, modname):
         self.cli.service(modname)
 
@@ -85,6 +91,7 @@ if len(sys.argv) == 1:
     print '              remove PATH ...'
     print '              rename OLD NEW'
     print '              service SERVICE'
+    print '              display {on|off}'
     print '              reset'
     exit()
 
@@ -121,6 +128,14 @@ elif sys.argv[1] == 'remove':
 
 elif sys.argv[1] == 'rename':
     admin.rename(sys.argv[2], sys.argv[3])
+
+elif sys.argv[1] == 'display':
+    if sys.argv[2] == 'on':
+        admin.display_on()
+    elif sys.argv[2] == 'off':
+        admin.display_off()
+    else:
+        print 'display require on/off'
 
 elif sys.argv[1] == 'service':
     admin.service(sys.argv[2])
