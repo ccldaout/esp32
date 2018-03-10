@@ -4,7 +4,7 @@ import spi
 import sys
 import time
 from display import *
-from config import ssd1331 as config
+from config.ssd1331 import config
 
 
 #----------------------------------------------------------------------------

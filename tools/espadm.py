@@ -5,14 +5,6 @@ import os
 import sys
 from tpp import uipc
 
-IP_ADDRESS = os.getenv('ESP32_ADDR', '192.168.0.105')
-
-if len(sys.argv) == 1:
-    print 'Usage: espadm put[small] PATH ...'
-    print '       espadm mkdir DIR ...'
-    print '       espadm reset'
-    exit()
-
 class AdminCommand(object):
 
     def __init__(self):
@@ -27,6 +19,10 @@ class AdminCommand(object):
         if self.on_close:
             self.on_cloase()
 
+    def reset(self):
+        self.cli.reset()
+        self.stop()
+
     def put_small(self, path):
         with open(path, 'rb') as f:
             data = binascii.hexlify(f.read())
@@ -36,7 +32,7 @@ class AdminCommand(object):
         with open(path, 'rb') as f:
             self.cli.put_beg(path)
             while True:
-                data = f.read(2048)
+                data = f.read(1024)
                 if not data:
                     break
                 data = binascii.hexlify(data)
@@ -44,7 +40,7 @@ class AdminCommand(object):
             self.cli.put_end()
 
     def get(self, path):
-        with open(path+'.tmp', 'rb') as f:
+        with open(path+'.tmp', 'wb') as f:
             self.cli.get_beg(path)
             while True:
                 data = self.cli.get_data()
@@ -72,26 +68,40 @@ class AdminCommand(object):
     def rename(self, source, target):
         self.cli.rename(source, target)
 
-    def service(self, modname, portnum):
-        self.cli.service(modname, portnum)
+    def service(self, modname):
+        self.cli.service(modname)
 
-    def reset(self):
-        self.cli.reset()
-        self.stop()
+IP_ADDRESS = os.getenv('ESP32_ADDR', '192.168.0.105')
 
 admin = AdminCommand()
 admin.start(IP_ADDRESS)
 
+if len(sys.argv) == 1:
+    print 'Usage: espadm put[small] PATH ...'
+    print '              get PATH ...'
+    print '              mkdir DIR ...'
+    print '              rmdir DIR ...'
+    print '              ls DIR ...'
+    print '              remove PATH ...'
+    print '              rename OLD NEW'
+    print '              service SERVICE'
+    print '              reset'
+    exit()
+
 if sys.argv[1] == 'reset':
     admin.reset()
+
+elif sys.argv[1] == 'putsmall':
+    for path in sys.argv[2:]:
+        admin.put_small(path)
 
 elif sys.argv[1] == 'put':
     for path in sys.argv[2:]:
         admin.put(path)
 
-elif sys.argv[1] == 'putsmall':
+elif sys.argv[1] == 'get':
     for path in sys.argv[2:]:
-        admin.put_small(path)
+        admin.get(path)
 
 elif sys.argv[1] == 'mkdir':
     for path in sys.argv[2:]:
@@ -113,7 +123,7 @@ elif sys.argv[1] == 'rename':
     admin.rename(sys.argv[2], sys.argv[3])
 
 elif sys.argv[1] == 'service':
-    admin.service(sys.argv[2], int(sys.argv[3]))
+    admin.service(sys.argv[2])
 
 else:
     print 'Unknown command:', sys.argv[1]

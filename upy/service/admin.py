@@ -2,7 +2,9 @@ import binascii
 import os
 import _thread
 import machine
+
 import uipc
+from config.service_admin import config
 
 
 @uipc.autoreply
@@ -88,24 +90,14 @@ class AdminService(uipc.ServiceBase):
         self._logger('remove %s' % path)
 
     @uipc.autoreply
-    def service(self, modname, portnum):
+    def service(self, modname):
         svc = __import__('service.' + modname)
         m = getattr(svc, modname)
         f = getattr(m, 'register')
-        f(portnum)
+        portnum = f()
         self._logger('%s ... registered' % modname)
+        return portnum
 
-    @uipc.autoreply
-    def demo(self, modname, args, kwargs):
-        if args is None:
-            args = ()
-        if kwargs is None:
-            kwargs = {}
-        demo = __import__('demo.' + modname)
-        m = getattr(demo, modname)
-        f = getattr(m, 'demo')
-        _thread.start_new_thread(f, ())
-
-
-def register(port):
-    uipc.manager.register_server(port, AdminService())
+def register():
+    uipc.manager.register_server(config.port, AdminService())
+    return config.port

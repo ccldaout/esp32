@@ -6,7 +6,7 @@ import uipc
 import uwifi
 import service
 
-from config import wifi as config
+from config.boot_full import config
 
         
 class WifiProgressSSD1331(uwifi.WifiProgressBase):
@@ -89,14 +89,20 @@ class WifiProgressSSD1331(uwifi.WifiProgressBase):
 
 
 def start_wifi():
-    wifi = uwifi.WifiNetwork(WifiProgressSSD1331())
+    progress = uwifi.WifiProgressBase()
+    if config.progress_ssd1331:
+        try:
+            progress = WifiProgressSSD1331()
+        except:
+            pass
+    wifi = uwifi.WifiNetwork(progress)
     if not wifi.try_station_mode():
         wifi.start_ap_mode()
     if wifi.ip_address:
-        for svcname, portnum in config.services:
+        for svcname in config.services:
             svcmod = __import__('service.'+svcname)
             mod = getattr(svcmod, svcname)
             register = getattr(mod, 'register')
-            register(portnum)
+            register()
 
 _thread.start_new_thread(start_wifi, ())

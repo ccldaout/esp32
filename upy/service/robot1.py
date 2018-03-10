@@ -4,7 +4,7 @@ import time
 
 import uipc
 import drv8835
-from config import robot as config
+from config.service_robot1 import config
 
 
 @uipc.autoreply
@@ -58,5 +58,6 @@ class RobotService(uipc.ServiceBase):
         self._drv.phen_raw_b_dir(value)
 
 
-def register(port):
-    uipc.manager.register_server(port, RobotService())
+def register():
+    uipc.manager.register_server(config.port, RobotService())
+    return config.port
