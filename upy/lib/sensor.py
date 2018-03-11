@@ -28,11 +28,11 @@ class QTRxRC(object):
                  duration_us=30,
                  timeout_us=50):
         self._pins = [machine.Pin(n) for n in pinnum_list]
-        self._duration_us = duration_us
-        self._timeout_us = timeout_us
+        self.duration_us = duration_us
+        self.timeout_us = timeout_us
 
     def sense(self):
-        dur_us, tmo_us = self._duration_us, self._timeout_us
+        dur_us, tmo_us = self.duration_us, self.timeout_us
         for pin in self._pins:
             pin.init(machine.Pin.OUT, value=1)
             time.sleep_us(dur_us)

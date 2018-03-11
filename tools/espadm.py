@@ -75,7 +75,7 @@ class AdminCommand(object):
         self.cli.display_off()
 
     def service(self, modname):
-        self.cli.service(modname)
+        return self.cli.service(modname)
 
 IP_ADDRESS = os.getenv('ESP32_ADDR', '192.168.0.105')
 
@@ -138,7 +138,8 @@ elif sys.argv[1] == 'display':
         print 'display require on/off'
 
 elif sys.argv[1] == 'service':
-    admin.service(sys.argv[2])
+    port = admin.service(sys.argv[2])
+    print 'port:', port
 
 else:
     print 'Unknown command:', sys.argv[1]

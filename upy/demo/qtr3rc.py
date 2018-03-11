@@ -1,20 +1,19 @@
 import machine
 import time
 
-pins = (machine.Pin(26), machine.Pin(27), machine.Pin(15))
+from sensor import QTRxRC
 
-def check(time_us, tmo_us):
-    for pin in pins:
-        pin.init(machine.Pin.OUT, value=1)
-        time.sleep_us(time_us)				# 50 us
-        pin.init(machine.Pin.IN)
-        yield machine.time_pulse_us(pin, 1, tmo_us)	# 100 us
-        pin.init(machine.Pin.OUT, value=0)
+pins = (26, 27, 15)
+
+sensor = QTRxRC(pins)
 
 def test(cnt, time_us, tmo_us, itv_s):
+    sensor.duration_us = time_us
+    sensor.timeout_us = tmo_us
+
     beg = time.time()
     for _ in range(cnt):
-        print(tuple(check(time_us, tmo_us)))
+        print(tuple(sensor.sense()))
         time.sleep(itv_s)
     ela = time.time() - beg
     print('avg sec', ela/cnt - itv_s)
