@@ -139,6 +139,9 @@ void mp_hal_stdout_tx_strn_cooked_x(const char *str, uint32_t len, bool forward)
     char buff[64];
     char *p, *e = &buff[sizeof(buff)];
 
+    if (stdout_forwarder == 0)
+	forward = false;
+
     MP_THREAD_GIL_EXIT();
     p = buff;
     while (len--) {
