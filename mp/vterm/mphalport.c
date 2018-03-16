@@ -58,6 +58,7 @@ void mp_hal_set_stdout_forwarder(void (*forwarder)(const char *, uint32_t))
 	    xSemaphoreGive(mutex_handle);
     }
     stdout_forwarder = forwarder;
+    return true;
 }
 
 STATIC inline void sem_lock(void)
@@ -74,15 +75,13 @@ STATIC inline void sem_unlock(void)
     }
 }
 
-void mp_hal_stdin_rx_insert(const char *data, mp_uint_t size)	/* NEW */
+void mp_hal_stdin_rx_insert(const char *data, mp_uint_t size)
 {
-    uart_disable_rx_intr(UART_NUM_0);
     sem_lock();
     for (; size; data++, size--) {
 	ringbuf_put(&stdin_ringbuf, *data);
     }
     sem_unlock();
-    uart_enable_rx_intr(UART_NUM_0);
 }
 
 int mp_hal_stdin_rx_chr(void) {
@@ -108,7 +107,6 @@ STATIC void call_stdout_forwarder(const char *str, uint32_t len)
 
 void mp_hal_stdout_tx_char(char c) {
     uart_tx_one_char(c);
-    //mp_uos_dupterm_tx_strn(&c, 1);
 }
 
 void mp_hal_stdout_tx_str_x(const char *str, bool forward) {

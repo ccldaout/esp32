@@ -132,7 +132,7 @@ SRC_C = \
 	uart.c \
 	gccollect.c \
 	mphalport.c \
-	airterm.c \
+	vterm.c \
 	fatfs_port.c \
 	help.c \
 	modutime.c \

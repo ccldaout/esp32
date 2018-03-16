@@ -224,6 +224,16 @@ STATIC mp_obj_t socket_setsockopt(size_t n_args, const mp_obj_t *args) {
             break;
         }
 
+        // level: IPPROTO_TCP
+        case TCP_NODELAY: {
+            int val = mp_obj_get_int(args[3]);
+            int ret = lwip_setsockopt_r(self->fd, IPPROTO_TCP, opt, &val, sizeof(int));
+            if (ret != 0) {
+                exception_from_errno(errno);
+            }
+            break;
+        }
+
         // level: IPPROTO_IP
         case IP_ADD_MEMBERSHIP: {
             mp_buffer_info_t bufinfo;
@@ -563,6 +573,7 @@ STATIC mp_obj_t esp_socket_initialize() {
     if (!initialized) {
         ESP_LOGI("modsocket", "Initializing");
         tcpip_adapter_init();
+	mp_vterm_init();
         initialized = 1;
     }
     return mp_const_none;
@@ -572,10 +583,10 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_socket_initialize_obj, esp_socket_initializ
 STATIC mp_obj_t socket_airterm(mp_obj_t arg) {
     bool ret = true;
     if (arg == mp_const_none) {
-	mp_airterm_unregister();
+	mp_vterm_unregister();
     } else {
 	socket_obj_t *sock = MP_OBJ_TO_PTR(arg);
-	ret = mp_airterm_register(sock->fd);
+	ret = mp_vterm_register_airterm(sock->fd);
 	sock->fd = -1;
     }
     return ret ? mp_const_true : mp_const_false;
@@ -599,6 +610,7 @@ STATIC const mp_map_elem_t mp_module_socket_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_SOL_SOCKET), MP_OBJ_NEW_SMALL_INT(SOL_SOCKET) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_SO_REUSEADDR), MP_OBJ_NEW_SMALL_INT(SO_REUSEADDR) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_IP_ADD_MEMBERSHIP), MP_OBJ_NEW_SMALL_INT(IP_ADD_MEMBERSHIP) },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_TCP_NODELAY), MP_OBJ_NEW_SMALL_INT(TCP_NODELAY) },
     { MP_ROM_QSTR(MP_QSTR_airterm), (mp_obj_t)&socket_airterm_obj },
 };
 
