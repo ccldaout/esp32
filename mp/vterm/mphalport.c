@@ -40,68 +40,43 @@
 #include "lib/utils/pyexec.h"
 
 #include "driver/uart.h"
-#include "mphalport_add.h"
 #include "freertos/semphr.h"
 #include "py/runtime.h"
+#include "vterm.h"
 
-STATIC uint8_t stdin_ringbuf_array[256];
-ringbuf_t stdin_ringbuf = {stdin_ringbuf_array, sizeof(stdin_ringbuf_array)};
+RingbufHandle_t stdin_ringbuf;
 
-static void (*stdout_forwarder)(const char *data, uint32_t len);
-STATIC SemaphoreHandle_t mutex_handle;
+STATIC void stdout_forwarder_noop(const char *data, uint32_t len)
+{
+}
+
+STATIC void (*stdout_forwarder)(const char *data, uint32_t len) = stdout_forwarder_noop;
+
+void mp_hal_init(void)
+{
+    stdin_ringbuf = xRingbufferCreate(128, RINGBUF_TYPE_BYTEBUF);
+}
 
 void mp_hal_set_stdout_forwarder(void (*forwarder)(const char *, uint32_t))
 {
-    if (mutex_handle == 0) {
-	mutex_handle = xSemaphoreCreateMutex();
-	if (mutex_handle)
-	    xSemaphoreGive(mutex_handle);
-    }
-    stdout_forwarder = forwarder;
-    return true;
-}
-
-STATIC inline void sem_lock(void)
-{
-    if (mutex_handle) {
-	(void)xSemaphoreTake(mutex_handle, portTICK_PERIOD_MS);
-    }
-}
-
-STATIC inline void sem_unlock(void)
-{
-    if (mutex_handle) {
-	xSemaphoreGive(mutex_handle);
-    }
+    stdout_forwarder = forwarder ? forwarder : stdout_forwarder_noop;
 }
 
 void mp_hal_stdin_rx_insert(const char *data, mp_uint_t size)
 {
-    sem_lock();
-    for (; size; data++, size--) {
-	ringbuf_put(&stdin_ringbuf, *data);
-    }
-    sem_unlock();
+    xRingbufferSend(stdin_ringbuf, (void *)data, size, 5000/portTICK_PERIOD_MS);
 }
 
 int mp_hal_stdin_rx_chr(void) {
+    size_t n;
     for (;;) {
-	sem_lock();
-        int c = ringbuf_get(&stdin_ringbuf);
-	sem_unlock();
-        if (c != -1) {
-            return c;
-        }
+	char *p = xRingbufferReceiveUpTo(stdin_ringbuf, &n, 1, 1);
+	if (p != 0) {
+	    int c = *p;
+	    vRingbufferReturnItem(stdin_ringbuf, p);
+	    return c;
+	}
         MICROPY_EVENT_POLL_HOOK
-        vTaskDelay(1);
-    }
-}
-
-STATIC void call_stdout_forwarder(const char *str, uint32_t len)
-{
-    void (*forwarder)(const char *, uint32_t) = stdout_forwarder;
-    if (forwarder != 0) {
-	forwarder(str, len);
     }
 }
 
@@ -116,9 +91,9 @@ void mp_hal_stdout_tx_str_x(const char *str, bool forward) {
     while (*str) {
         mp_hal_stdout_tx_char(*str++);
     }
-    if (forward)
-	call_stdout_forwarder(s, n);
     MP_THREAD_GIL_ENTER();
+    if (forward)
+	stdout_forwarder(s, n);
 }
 
 void mp_hal_stdout_tx_strn_x(const char *str, uint32_t len, bool forward) {
@@ -128,43 +103,36 @@ void mp_hal_stdout_tx_strn_x(const char *str, uint32_t len, bool forward) {
     while (len--) {
         mp_hal_stdout_tx_char(*str++);
     }
-    if (forward)
-	call_stdout_forwarder(s, n);
     MP_THREAD_GIL_ENTER();
+    if (forward)
+	stdout_forwarder(s, n);
 }
 
 void mp_hal_stdout_tx_strn_cooked_x(const char *str, uint32_t len, bool forward) {
-    char buff[64];
-    char *p, *e = &buff[sizeof(buff)];
 
-    if (stdout_forwarder == 0)
+    const char cr = '\r';
+    const char *np = str;
+
+    if (stdout_forwarder == stdout_forwarder_noop)
 	forward = false;
 
     MP_THREAD_GIL_EXIT();
-    p = buff;
     while (len--) {
         if (*str == '\n') {
 	    if (forward) {
-		if (p == e) {
-		    call_stdout_forwarder(buff, sizeof(buff));
-		    p = buff;
-		}
-		*p++ = '\r';
+		MP_THREAD_GIL_ENTER();
+		stdout_forwarder(np, str - np);
+		stdout_forwarder(&cr, 1);
+		MP_THREAD_GIL_EXIT();
+		np = str;
 	    }
-            mp_hal_stdout_tx_char('\r');
+            mp_hal_stdout_tx_char(cr);
         }
-	if (forward) {
-	    if (p == e) {
-		call_stdout_forwarder(buff, sizeof(buff));
-		p = buff;
-	    }
-	    *p++ = *str;
-	}
         mp_hal_stdout_tx_char(*str++);
     }
-    if (forward)
-	call_stdout_forwarder(buff, p - buff);
     MP_THREAD_GIL_ENTER();
+    if (forward)
+	stdout_forwarder(np, str - np);
 }
 
 void mp_hal_stdout_tx_str(const char *str) {

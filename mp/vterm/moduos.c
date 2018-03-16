@@ -36,9 +36,12 @@
 #include "py/objstr.h"
 #include "py/runtime.h"
 #include "py/mperrno.h"
+#include "py/stream.h"
 #include "extmod/vfs.h"
 #include "extmod/vfs_fat.h"
 #include "genhdr/mpversion.h"
+
+#include "vterm.h"
 
 extern const mp_obj_type_t mp_fat_vfs_type;
 
@@ -84,27 +87,25 @@ STATIC mp_obj_t os_urandom(mp_obj_t num) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(os_urandom_obj, os_urandom);
 
-#if MICROPY_PY_OS_DUPTERM
 STATIC mp_obj_t os_dupterm(size_t n_args, const mp_obj_t *args) {
-    if (args[0] == 0 mp_const_none) {
+    if (args[0] == mp_const_none) {
 	mp_vterm_unregister();
-	return mp_const_none;
     } else {
-	if (!mp_vterm_register_dupterm())
-	    return mp_const_none;
-	return mp_uos_dupterm(n_args, args);
+	if (mp_get_stream_raise(args[1], MP_STREAM_OP_READ|MP_STREAM_OP_WRITE) != 0) {
+	    if (!mp_vterm_register_dupterm(args[1])) {
+		mp_raise_OSError(MP_EINVAL);
+	    }
+	}
     }
+    return mp_const_none;
 }
-STTIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_uos_dupterm_obj, 1, 2, mp_uos_dupterm);
-#endif
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(os_dupterm_obj, 1, 2, os_dupterm);
 
 STATIC const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_uos) },
     { MP_ROM_QSTR(MP_QSTR_uname), MP_ROM_PTR(&os_uname_obj) },
     { MP_ROM_QSTR(MP_QSTR_urandom), MP_ROM_PTR(&os_urandom_obj) },
-    #if MICROPY_PY_OS_DUPTERM
     { MP_ROM_QSTR(MP_QSTR_dupterm), MP_ROM_PTR(&os_dupterm_obj) },
-    #endif
     #if MICROPY_VFS
     { MP_ROM_QSTR(MP_QSTR_ilistdir), MP_ROM_PTR(&mp_vfs_ilistdir_obj) },
     { MP_ROM_QSTR(MP_QSTR_listdir), MP_ROM_PTR(&mp_vfs_listdir_obj) },

@@ -54,7 +54,7 @@
 #include "lwip/igmp.h"
 #include "esp_log.h"
 
-#include "mphalport_add.h"
+#include "vterm.h"
 
 #define SOCKET_POLL_US (100000)
 
@@ -573,7 +573,6 @@ STATIC mp_obj_t esp_socket_initialize() {
     if (!initialized) {
         ESP_LOGI("modsocket", "Initializing");
         tcpip_adapter_init();
-	mp_vterm_init();
         initialized = 1;
     }
     return mp_const_none;
