@@ -34,49 +34,49 @@
 #include "freertos/task.h"
 #include "rom/uart.h"
 
+#include "py/obj.h"
 #include "py/mpstate.h"
 #include "py/mphal.h"
 #include "extmod/misc.h"
 #include "lib/utils/pyexec.h"
 
-#include "driver/uart.h"
-#include "freertos/semphr.h"
-#include "py/runtime.h"
-#include "vterm.h"
+STATIC uint8_t stdin_ringbuf_array[256];
+ringbuf_t stdin_ringbuf = {stdin_ringbuf_array, sizeof(stdin_ringbuf_array)};
 
-RingbufHandle_t stdin_ringbuf;
+static int noop_stdin_rx_chr(void)
+{
+    return -1;
+}
 
-STATIC void stdout_forwarder_noop(const char *data, uint32_t len)
+static void noop_stdout_tx_strn(const char *str, uint32_t len)
 {
 }
 
-STATIC void (*stdout_forwarder)(const char *data, uint32_t len) = stdout_forwarder_noop;
+static int (*dup_stdin_rx_chr)(void) = noop_stdin_rx_chr;
+static void (*dup_stdout_tx_strn)(const char *str, uint32_t len) = noop_stdout_tx_strn;
 
-void mp_hal_init(void)
+void mp_hal_stdin_dup(int (*rx_chr)(void))
 {
-    stdin_ringbuf = xRingbufferCreate(128, RINGBUF_TYPE_BYTEBUF);
+    dup_stdin_rx_chr = rx_chr ? rx_chr : noop_stdin_rx_chr;
 }
 
-void mp_hal_set_stdout_forwarder(void (*forwarder)(const char *, uint32_t))
+void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len))
 {
-    stdout_forwarder = forwarder ? forwarder : stdout_forwarder_noop;
-}
-
-void mp_hal_stdin_rx_insert(const char *data, mp_uint_t size)
-{
-    xRingbufferSend(stdin_ringbuf, (void *)data, size, 5000/portTICK_PERIOD_MS);
+    dup_stdout_tx_strn = tx_strn ? tx_strn : noop_stdout_tx_strn;
 }
 
 int mp_hal_stdin_rx_chr(void) {
-    size_t n;
     for (;;) {
-	char *p = xRingbufferReceiveUpTo(stdin_ringbuf, &n, 1, 1);
-	if (p != 0) {
-	    int c = *p;
-	    vRingbufferReturnItem(stdin_ringbuf, p);
-	    return c;
-	}
+        int c = ringbuf_get(&stdin_ringbuf);
+        if (c != -1) {
+            return c;
+        }
+	c = dup_stdin_rx_chr();
+        if (c != -1) {
+            return c;
+        }
         MICROPY_EVENT_POLL_HOOK
+        vTaskDelay(1);
     }
 }
 
@@ -84,67 +84,39 @@ void mp_hal_stdout_tx_char(char c) {
     uart_tx_one_char(c);
 }
 
-void mp_hal_stdout_tx_str_x(const char *str, bool forward) {
-    const char * const s = str;
-    uint32_t n = strlen(s);
+void mp_hal_stdout_tx_str(const char *str) {
     MP_THREAD_GIL_EXIT();
+    dup_stdout_tx_strn(str, strlen(str));
     while (*str) {
         mp_hal_stdout_tx_char(*str++);
     }
     MP_THREAD_GIL_ENTER();
-    if (forward)
-	stdout_forwarder(s, n);
 }
 
-void mp_hal_stdout_tx_strn_x(const char *str, uint32_t len, bool forward) {
-    const char * const s = str;
-    const uint32_t n = len;
+void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
     MP_THREAD_GIL_EXIT();
+    dup_stdout_tx_strn(str, len);
     while (len--) {
         mp_hal_stdout_tx_char(*str++);
     }
     MP_THREAD_GIL_ENTER();
-    if (forward)
-	stdout_forwarder(s, n);
 }
 
-void mp_hal_stdout_tx_strn_cooked_x(const char *str, uint32_t len, bool forward) {
-
+void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
+    const char *p = str;
     const char cr = '\r';
-    const char *np = str;
-
-    if (stdout_forwarder == stdout_forwarder_noop)
-	forward = false;
-
     MP_THREAD_GIL_EXIT();
     while (len--) {
         if (*str == '\n') {
-	    if (forward) {
-		MP_THREAD_GIL_ENTER();
-		stdout_forwarder(np, str - np);
-		stdout_forwarder(&cr, 1);
-		MP_THREAD_GIL_EXIT();
-		np = str;
-	    }
+	    dup_stdout_tx_strn(p, str - p);
+	    dup_stdout_tx_strn(&cr, 1);
+	    p = str;
             mp_hal_stdout_tx_char(cr);
         }
         mp_hal_stdout_tx_char(*str++);
     }
+    dup_stdout_tx_strn(p, str - p);
     MP_THREAD_GIL_ENTER();
-    if (forward)
-	stdout_forwarder(np, str - np);
-}
-
-void mp_hal_stdout_tx_str(const char *str) {
-    mp_hal_stdout_tx_str_x(str, true);
-}
-
-void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
-    mp_hal_stdout_tx_strn_x(str, len, true);
-}
-
-void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
-    mp_hal_stdout_tx_strn_cooked_x(str, len, true);
 }
 
 uint32_t mp_hal_ticks_ms(void) {

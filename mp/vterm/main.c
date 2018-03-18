@@ -48,7 +48,6 @@
 #include "uart.h"
 #include "modmachine.h"
 #include "mpthreadport.h"
-#include "mphalport.h"
 #include "vterm.h"
 
 // MicroPython runs as a task under FreeRTOS
@@ -65,7 +64,6 @@ void mp_task(void *pvParameter) {
     mp_thread_init(&mp_task_stack[0], MP_TASK_STACK_LEN);
     #endif
     uart_init();
-    mp_hal_init();
     mp_vterm_init();
 
     // Allocate the uPy heap using malloc and get the largest available region

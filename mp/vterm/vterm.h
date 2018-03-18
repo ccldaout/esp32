@@ -29,15 +29,10 @@
 #ifndef INCLUDED_VTERM_H
 #define INCLUDED_VTERM_H
 
-void mp_hal_stdin_rx_insert(const char *data, mp_uint_t size);
-void mp_hal_set_stdout_forwarder(void (*forwarder)(const char *, uint32_t));
-void mp_hal_stdout_tx_str_x(const char *str, bool foward);
-void mp_hal_stdout_tx_strn_x(const char *str, uint32_t len, bool forward);
-void mp_hal_stdout_tx_strn_cooked_x(const char *str, uint32_t len, bool forward);
-
 void mp_vterm_init(void);
 bool mp_vterm_register_airterm(int socket);
-bool mp_vterm_register_dupterm(mp_obj_t stream);
+bool mp_vterm_register_dupterm_nonblocking(mp_obj_t stream);
+bool mp_vterm_register_dupterm(mp_obj_t stream, int stacksize_b);
 void mp_vterm_unregister(void);
 
 #endif // INCLUDED_VTERM_H

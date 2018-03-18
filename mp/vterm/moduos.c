@@ -88,18 +88,31 @@ STATIC mp_obj_t os_urandom(mp_obj_t num) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(os_urandom_obj, os_urandom);
 
 STATIC mp_obj_t os_dupterm(size_t n_args, const mp_obj_t *args) {
+    STATIC mp_obj_t prev_stream;
+    mp_obj_t ret_stream = prev_stream;
     if (args[0] == mp_const_none) {
-	mp_vterm_unregister();
+	prev_stream = mp_const_none;
+    } else if (args[0] == prev_stream) {
+	;
     } else {
-	if (mp_get_stream_raise(args[1], MP_STREAM_OP_READ|MP_STREAM_OP_WRITE) != 0) {
-	    if (!mp_vterm_register_dupterm(args[1])) {
+	if (mp_get_stream_raise(args[0], MP_STREAM_OP_READ|MP_STREAM_OP_WRITE) != 0) {
+	    bool ret = false;
+	    prev_stream = args[0];
+	    mp_vterm_unregister();
+	    if (n_args == 3) {
+		mp_int_t thread_stack_size = mp_obj_get_int(args[2]);
+		if (thread_stack_size >= 0)
+		    ret = mp_vterm_register_dupterm(prev_stream, thread_stack_size);
+	    } else
+		ret = mp_vterm_register_dupterm_nonblocking(prev_stream);
+	    if (!ret) {
 		mp_raise_OSError(MP_EINVAL);
 	    }
 	}
     }
-    return mp_const_none;
+    return ret_stream;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(os_dupterm_obj, 1, 2, os_dupterm);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(os_dupterm_obj, 1, 3, os_dupterm);
 
 STATIC const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_uos) },
