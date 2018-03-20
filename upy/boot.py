@@ -1,40 +1,41 @@
-import os
-import time
-import _thread
+def _boot():
+    import os
+    import machine
+    import sys
 
-BOOT_MODE_DIR = ['/', '/BOOT.MINI', '/BOOT.FULL']
-BOOT_MODE = 0
-
-def enable_bootmode(sleep_s, mode):
-    time.sleep(sleep_s)
-    os.mkdir(BOOT_MODE_DIR[mode])
-
-for m, d in enumerate(BOOT_MODE_DIR):
     try:
-        os.stat(d)
-        BOOT_MODE = m
-    except:
-        pass
+        BOOT_PIN = 36	# SVP
+        BOOT_MODE = 0
 
-if BOOT_MODE == 2:
-    try:
-        os.rmdir(BOOT_MODE_DIR[BOOT_MODE])
-    except:
-        pass
-    import boot.full
-    _thread.start_new_thread(enable_bootmode, (10, BOOT_MODE))
+        value = machine.Pin(BOOT_PIN, machine.Pin.IN).value()
 
-elif BOOT_MODE == 1:
-    try:
-        os.rmdir(BOOT_MODE_DIR[BOOT_MODE])
-    except:
-        pass
-    import boot.mini
-    _thread.start_new_thread(enable_bootmode, (10, BOOT_MODE))
+        print('boot: PIN#%1d: %s', BOOT_PIN, value)
 
-else:
-    for d in BOOT_MODE_DIR:
-        try:
-            os.mkdir(d)
-        except:
-            pass
+        if value == 0:
+            print('boot: full mode ...')
+            import boot.full
+
+        else:
+            import time
+            for i in range(5):
+                print('boot: wait for interrupt', '.'*(i+1), end='\r')
+                time.sleep(1)
+            print()
+            print('boot: mini mode ...')
+            import boot.mini
+
+        def cat(path):
+            with open(path) as f:
+                for s in f:
+                    print(s.rstrip())
+
+        gdic = globals()
+        gdic['cd'] = os.chdir
+        gdic['ls'] = os.listdir
+        gdic['cat'] = cat
+
+    except Exception as e:
+        sys.print_exception(e)
+
+_boot()
+del _boot
