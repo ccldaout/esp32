@@ -4,7 +4,7 @@ def _boot():
     import sys
 
     try:
-        BOOT_PIN = 36	# SVP
+        BOOT_PIN = 2
         BOOT_MODE = 0
 
         value = machine.Pin(BOOT_PIN, machine.Pin.IN).value()
