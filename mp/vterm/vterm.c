@@ -35,11 +35,11 @@
 
 #include "vterm.h"
 
-#define BUFSIZE_b 		64
+#define BUFSIZE_b 		128
 #define PUSH_WAIT_tick		( 1000 / portTICK_PERIOD_MS)
 #define UNREG_WAIT_tick		( 1000 / portTICK_PERIOD_MS)
 #define RINGBUF_WAIT_tick	(60000 / portTICK_PERIOD_MS)
-#define IO_INTERVAL_us		(25 * 1000)
+#define IO_INTERVAL_us		(20 * 1000)
 #define RINGBUF_SIZE_b		(16)
 
 typedef struct _vterm_ops_t {
@@ -303,9 +303,9 @@ STATIC void airterm_unregister(void *__vctx)
 
 bool mp_vterm_register_airterm(int socket)
 {
-    int enable = 1;
+    //int enable = 1;
+    //lwip_setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(enable));
     airterm_ctx.socket = socket;
-    lwip_setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
     _vterm_ops_t ops = {
 	.nonblocking_read = true,
