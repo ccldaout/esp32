@@ -11,9 +11,18 @@ def test(cnt, time_us, tmo_us, itv_s):
     sensor.duration_us = time_us
     sensor.timeout_us = tmo_us
 
+    def sensed():
+        for v in sensor.sense():
+            if v == -2:
+                yield 'W'
+            elif v == -1:
+                yield 'B'
+            else:
+                yield '? (%d)' % v
+
     beg = time.time()
     for _ in range(cnt):
-        print(tuple(sensor.sense()))
+        print(tuple(sensed()))
         time.sleep(itv_s)
     ela = time.time() - beg
     print('avg sec', ela/cnt - itv_s)
