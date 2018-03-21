@@ -1,6 +1,6 @@
 #!/bin/bash
 
-espmini mkdir config data fonts lib service BOOT.FULL
+espmini mkdir config data fonts lib service
 espmini put boot/* config/*.py lib/*.py service/*.py
 
 (

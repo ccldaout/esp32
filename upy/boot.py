@@ -9,7 +9,7 @@ def _boot():
 
         value = machine.Pin(BOOT_PIN, machine.Pin.IN).value()
 
-        print('boot: PIN#%1d: %s', BOOT_PIN, value)
+        print('boot: PIN#%d: %d' % (BOOT_PIN, value))
 
         if value == 0:
             print('boot: full mode ...')
