@@ -2,14 +2,14 @@ import os
 import sys
 import _thread
 import ssd1331
-import uipc
-import uwifi
+import mipc
+import wifi
 import service
 
 from config.boot_full import config
 
         
-class WifiProgressSSD1331(uwifi.WifiProgressBase):
+class WifiProgressSSD1331(wifi.WifiProgressBase):
 
     def __init__(self):
         driver = ssd1331.vspi()
@@ -89,16 +89,16 @@ class WifiProgressSSD1331(uwifi.WifiProgressBase):
 
 
 def start_wifi():
-    progress = uwifi.WifiProgressBase()
+    progress = wifi.WifiProgressBase()
     if config.progress_ssd1331:
         try:
             progress = WifiProgressSSD1331()
         except:
             pass
-    wifi = uwifi.WifiNetwork(progress)
-    if not wifi.try_station_mode():
-        wifi.start_ap_mode()
-    if wifi.ip_address:
+    wlan = wifi.WifiNetwork(progress)
+    if not wlan.try_station_mode():
+        wlan.start_ap_mode()
+    if wlan.ip_address:
         for svcname in config.services:
             svcmod = __import__('service.'+svcname)
             mod = getattr(svcmod, svcname)

@@ -3,7 +3,7 @@
 import binascii
 import os
 import sys
-from tpp import uipc
+from tpp import mipc
 
 class AdminCommand(object):
 
@@ -12,7 +12,7 @@ class AdminCommand(object):
         self.on_close = None
 
     def start(self, ip_address):
-        self.cli = uipc.client((ip_address, 2000))
+        self.cli = mipc.client((ip_address, 2000))
 
     def stop(self):
         self.cli.close()

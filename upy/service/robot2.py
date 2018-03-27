@@ -2,7 +2,7 @@ import os
 import machine
 import time
 
-import uipc
+import mipc
 import drv8835
 import sensor
 from config.service_robot2 import config
@@ -82,8 +82,8 @@ class Robot(object):
         self._drv.duty_a(a_duty)
         self._drv.duty_b(b_duty)
         
-@uipc.autoreply
-class RobotService(uipc.ServiceBase):
+@mipc.autoreply
+class RobotService(mipc.ServiceBase):
 
     def __init__(self):
         self._robot = Robot()
@@ -97,26 +97,26 @@ class RobotService(uipc.ServiceBase):
     def on_exception(self, port):
         self._logger('on_exception')
 
-    @uipc.autoreply
+    @mipc.autoreply
     def enable(self):
         self._robot.enable()
 
-    @uipc.autoreply
+    @mipc.autoreply
     def status(self):
         return self._robot.status
 
-    @uipc.autoreply
+    @mipc.autoreply
     def start_search(self):
         pass
 
-    @uipc.autoreply
+    @mipc.autoreply
     def start_trace(self):
         pass
 
-    @uipc.autoreply
+    @mipc.autoreply
     def stop(self):
         pass
 
 def register():
-    uipc.manager.register_server(config.port, RobotService())
+    mipc.manager.register_server(config.port, RobotService())
     return config.port

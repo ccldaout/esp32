@@ -19,7 +19,7 @@ def _thread_getlock():
     return _thread.allocate_lock()
 
 #### poll
-import select as upoll
+import select as mpoll
 
 #### socket.read
 def _recvall(sock, n):
@@ -91,6 +91,28 @@ class JSONPacker(DumpPackerBase):
     dumps = staticmethod(json.dumps)
     loads = staticmethod(json.loads)
 
+class UDPDumpPackerBase(DumpPackerBase):
+
+    MAXLEN = 512
+    recv_addr = None
+
+    def pack(self, msg):
+        data = self.dumps(msg)
+        n = len(data)
+        if n > self.MAXLEN:
+            raise PortError('UDP data size is too large.')
+        return data, n
+
+    def unpack(self, sock):
+        data, addr = sock.recvfrom(self.MAXLEN)
+        self.recv_addr = addr
+        return self.loads(data)
+
+class UDPJSONPacker(UDPDumpPackerBase):
+    import json
+    dumps = staticmethod(json.dumps)
+    loads = staticmethod(json.loads)
+
 
 #----------------------------------------------------------------------------
 #
@@ -108,6 +130,8 @@ class IOPort(object):
         self._lock = _thread_getlock()
         self._event = None
         self._autoreply_names = set()
+        if isinstance(packer, UDPDumpPackerBase):
+            self.send = self._send_udp
 
     def connect(self, addr):
         sock = socket.socket()
@@ -116,7 +140,7 @@ class IOPort(object):
         return self				# for method chain
 
     def negotiate(self):
-        self._autoreply_names = set(self.send(['uipc_negotiate']).result())
+        self._autoreply_names = set(self.send(['mipc_negotiate']).result())
         return self				# for method chain
 
     def recv(self):
@@ -127,6 +151,17 @@ class IOPort(object):
         data, n = self._packer.pack(msg)
         with self._lock:
             self.socket.sendall(data)		# raise exception if error
+        return self
+
+    def _send_udp(self, msg):
+        self._event = msg[0]
+        data, n = self._packer.pack(msg)
+        with self._lock:
+            addr = self._packer.recv_addr
+            if addr:
+                self.socket.sendto(data, addr)
+            else:
+                self.socket.send(data)
         return self
 
     def close(self):
@@ -155,6 +190,24 @@ class IOPort(object):
 
 def client(addr, packer=None):
     return IOPort(packer=packer).connect(addr).negotiate()
+
+def udp_client(addr, packer=None):
+    if packer is None:
+        packer = UDPJSONPacker()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.connect(addr)
+    sock.settimeout(5.0)	# TODO
+    return IOPort(sock=sock, packer=packer).negotiate()
+
+def udp_server(addr, packer=None):
+    if isinstance(addr, int):
+        addr = ('0.0.0.0', addr)
+    if packer is None:
+        packer = UDPJSONPacker()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(addr)
+    sock.settimeout(5.0)	# TODO
+    return IOPort(sock=sock, packer=packer)
 
 class AcceptablePort(object):
     acceptable = True
@@ -190,7 +243,6 @@ class _AutoReply(object):
             self._autoreply_names = set()
             return target
         else:
-            target = target
             def wrapper(svc_self, port, msg):	# args: self, port, msg
                 reply = msg[0] + '_reply'
                 try:
@@ -199,6 +251,7 @@ class _AutoReply(object):
                 except Exception as e:
                     port.send([reply, False, str(e)])
                     _print_exception(e)
+            wrapper.__name__ = target.__name__
             self._autoreply_names.add(target.__name__)
             return wrapper
 
@@ -226,12 +279,12 @@ class ServiceBase(object):
     def __call__(self, port):
         return self
 
-    # uipc_ prefixed methods are reserved for internal.
+    # mipc_ prefixed methods are reserved for internal.
 
-    def uipc_negotiate(self, port, msg):
-        port.send(['uipc_negotiate_reply', True, list(self._autoreply_names)])
+    def mipc_negotiate(self, port, msg):
+        port.send(['mipc_negotiate_reply', True, list(self._autoreply_names)])
 
-    def uipc_received(self, port, msg):
+    def mipc_received(self, port, msg):
         name = msg[0]
         if hasattr(self, name):
             getattr(self, name)(port, msg)
@@ -254,7 +307,7 @@ class ServiceBase(object):
 
 class _ServiceManager(object):
     def __init__(self):
-        self._poll = upoll.poll()
+        self._poll = mpoll.poll()
         self._ports = {}
         self.ip_address = '0.0.0.0'
         _thread_start(self.loop, ())
@@ -267,7 +320,7 @@ class _ServiceManager(object):
 
     def register(self, port, service_object):
         fd = port.socket.fileno()
-        self._poll.register(port.socket, upoll.POLLIN)
+        self._poll.register(port.socket, mpoll.POLLIN)
         self._ports[fd] = (port, service_object)
 
     def unregister(self, port):
@@ -296,7 +349,7 @@ class _ServiceManager(object):
                 else:
                     try:
                         msg = port.recv()
-                        service_object.uipc_received(port, msg)
+                        service_object.mipc_received(port, msg)
                     except SocketClosed as e:
                         self.unregister(port)
                         service_object.on_disconnected(port)

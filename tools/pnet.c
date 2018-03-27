@@ -100,6 +100,8 @@ static void loop(void)
     ssize_t n;
 
     (void)signal(SIGPIPE, SIG_IGN);
+    (void)strcpy(buffer, "\r\n");
+    (void)write(SOCK, buffer, 2);
 
     FD_ZERO(&mask);
 
