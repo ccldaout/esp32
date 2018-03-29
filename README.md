@@ -1,9 +1,22 @@
 # esp32 - My Play Ground
 
 This repository have mainly results of trial of MicroPython on esp32.
-- `mp/vterm`
+- `mp/...`
+
+   My customized sources and result of `git diff mater`. 
+
+   - `vterm / airterm / dupterm`
+
+     Termianl duplicators. `vterm` is a framework of duplication. `airterm` is one of duplicatior, it communicate raw data by LWIP level interface. `dupterm` is my original implementation on the `vterm` framework.
+
+   - `genstream`
+
+     `genstream` privide stream protocol to user defined class which have a read and a write method.
+
+- `mp/vterm (Obsolete)`
 
    A patch of MicroPython realize dupterm, airterm (my specialized dupterm) and WebREPL on esp32.
+   They are already included above tree.
    
 - `tools`
 
@@ -39,3 +52,7 @@ This repository have mainly results of trial of MicroPython on esp32.
    - `upy/service/*`
      
      There are several services implemented on above libraries. On the `full` mode boot, admin service is enable. 
+
+   - `upy/test/vsrfs.py`
+
+     Very Slow Remote File System over my original protocol.
