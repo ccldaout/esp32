@@ -81,19 +81,6 @@ VSRfs provide a file system interface over the network. You can `import` a pytho
 
    My customized sources and result of `git diff mater`. 
 
-   - `vterm / airterm / dupterm`
-
-     Termianl duplicators. `vterm` is a framework of duplication. `airterm` is one of duplicatior, it communicate raw data by LWIP level interface. `dupterm` is my original implementation on the `vterm` framework.
-
-   - `genstream`
-
-     `genstream` privide stream protocol to user defined class which have a read and a write method.
-
-- `mp/vterm (Obsolete)`
-
-   A patch of MicroPython realize dupterm, airterm (my specialized dupterm) and WebREPL on esp32.
-   They are already included above tree.
-   
 - `tools`
 
    There are several tools on PC side. 
