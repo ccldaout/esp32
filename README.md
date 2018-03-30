@@ -38,9 +38,9 @@ Original `mp_vfs_import_stat` search file for only internal and FAT file system.
 
 ### ports/esp32/machine_uart.c
 
-Original `machine_uart_make_new` which is called `machine.UART()` install a uart driver with a event queue handle. But no function read the handle. As a result, `event queue full` is caused. This function don't pass the handle in the install the driver. **This is a ad-hoc step.**
+Original `machine_uart_make_new` which is called `machine.UART()` install a uart driver with a event queue handle. But no function read the handle. As a result, `"event queue full"` error is caused. This function don't pass the handle in the install the driver. **This is a ad-hoc step.**
 
-## VSRfs - Very Slot (Stupid?) Remote File System
+## VSRfs - Very Slow (Stupid?) Remote File System
 
 VSRfs provide a file system interface over the network. You can `import` a python script on your PC without uploading. VSRfs depend on a custom class `genstream`, so it' required that customized firmware or a patch of micropython sources, both are provided on this site.
 
