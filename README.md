@@ -59,7 +59,7 @@ This repository have mainly results of trial of MicroPython on esp32.
 
      Very Slow Remote File System over my original protocol.
 
-## VSRfs - Very Slot (Stupid?) Remote File System
+## VSRfs - Very Slow (Stupid?) Remote File System
 
 VSRfs provide a file system interface over the network. You can `import` a python script on your PC without uploading. VSRfs depend on a custom class `genstream`, so it' required that customized firmware or a patch of micropython sources, both are provided on this site.
 
