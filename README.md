@@ -2,7 +2,7 @@
 
 ## Custom firmware
 
-My custom firmware `esp32-YYYYMMDD-v1.9.x-public.in` is located at top directory. It has several diffrences as follow:
+My custom firmware `esp32-YYYYMMDD-v1.9.x-ccldaout.bin` is located at top directory. It has several diffrences as follow:
 
 ### terminal duplication
 
