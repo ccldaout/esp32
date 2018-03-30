@@ -70,7 +70,7 @@ VSRfs provide a file system interface over the network. You can `import` a pytho
   >>> vsrfs = VSRfs(('HOST_NAME', PORT_NUM))
   >>> import os
   >>> os.moount(vsrfs, '/VSR')
- ```
+  ```
  
   MEMO: vsrfs.py require upy/lib/mipc.py
 
