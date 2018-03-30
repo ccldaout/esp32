@@ -1,5 +1,7 @@
 # esp32 - My Play Ground
 
+## Summary
+
 This repository have mainly results of trial of MicroPython on esp32.
 - `mp/...`
 
@@ -56,3 +58,34 @@ This repository have mainly results of trial of MicroPython on esp32.
    - `upy/test/vsrfs.py`
 
      Very Slow Remote File System over my original protocol.
+
+## VSRfs - Very Slot (Stupid?) Remote File System
+
+VSRfs provide a file system interface over the network. You can `import` a python script on your PC without uploading. VSRfs depend on a custom class `genstream`, so it' required that customized firmware or a patch of micropython sources, both are provided on this site.
+
+- server side - tools/vsrfsd.py
+
+  VSRfs server program is `tools/vsrfsd.py` depended on my another `tpp` package. The `tpp` is also public on a github. You can setup by following commands:
+
+  ```sh
+  prompt_% mkdir ~/test
+  prompt_% cd ~/test
+  promot_% git clone https://github.com/ccldaout/tpp.git
+  prompt_% cp FOOBAR/tools/vsrfsd.py .
+  prompt_% ./vsrfsd.py
+  Usage: [host]:port root_dir
+  ```
+    
+  `vsrfsd` require two parameters. 1st parameter is address of UDP server in the form of `host`:`port`.
+  2nd parameter is root directory to be exported.
+
+- client side - upy/test/vsrfs.py
+  
+  VSRfs client is VFS object of MicroPython. You can setup VSRfs in the following way:
+    
+  ```python
+  >>> from vsrfs import VSRfs
+  >>> vsrfs = VSRfs(('HOST_NAME', PORT_NUM))
+  >>> import os
+  >>> os.moount(vsrfs, '/VSR')
+ ```
