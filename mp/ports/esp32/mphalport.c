@@ -40,25 +40,11 @@
 #include "extmod/misc.h"
 #include "lib/utils/pyexec.h"
 
-STATIC uint8_t stdin_ringbuf_array[256];
-ringbuf_t stdin_ringbuf = {stdin_ringbuf_array, sizeof(stdin_ringbuf_array)};
-
-static int noop_stdin_rx_chr(void)
-{
-    return -1;
-}
-
 static void noop_stdout_tx_strn(const char *str, uint32_t len)
 {
 }
 
-static int (*dup_stdin_rx_chr)(void) = noop_stdin_rx_chr;
 static void (*dup_stdout_tx_strn)(const char *str, uint32_t len) = noop_stdout_tx_strn;
-
-void mp_hal_stdin_dup(int (*rx_chr)(void))
-{
-    dup_stdin_rx_chr = rx_chr ? rx_chr : noop_stdin_rx_chr;
-}
 
 void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len))
 {
@@ -67,12 +53,11 @@ void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len))
 
 int mp_hal_stdin_rx_chr(void) {
     for (;;) {
-        int c = ringbuf_get(&stdin_ringbuf);
-        if (c != -1) {
-            return c;
-        }
-	c = dup_stdin_rx_chr();
-        if (c != -1) {
+	size_t n;
+	unsigned char *p = xRingbufferReceiveUpTo(stdin_ringbuf, &n, 0, 1);
+	if (p) {
+	    int c = *p;
+	    vRingbufferReturnItem(stdin_ringbuf, p);
             return c;
         }
         MICROPY_EVENT_POLL_HOOK
@@ -80,15 +65,20 @@ int mp_hal_stdin_rx_chr(void) {
     }
 }
 
+#define _stdout_tx_char_OUTOFGIL(c)	uart_tx_one_char(c)
+
 void mp_hal_stdout_tx_char(char c) {
+    MP_THREAD_GIL_EXIT();
+    dup_stdout_tx_strn(&c, 1);
     uart_tx_one_char(c);
+    MP_THREAD_GIL_ENTER();
 }
 
 void mp_hal_stdout_tx_str(const char *str) {
     MP_THREAD_GIL_EXIT();
     dup_stdout_tx_strn(str, strlen(str));
     while (*str) {
-        mp_hal_stdout_tx_char(*str++);
+        _stdout_tx_char_OUTOFGIL(*str++);
     }
     MP_THREAD_GIL_ENTER();
 }
@@ -97,7 +87,7 @@ void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
     MP_THREAD_GIL_EXIT();
     dup_stdout_tx_strn(str, len);
     while (len--) {
-        mp_hal_stdout_tx_char(*str++);
+        _stdout_tx_char_OUTOFGIL(*str++);
     }
     MP_THREAD_GIL_ENTER();
 }
@@ -111,9 +101,9 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
 	    dup_stdout_tx_strn(p, str - p);
 	    dup_stdout_tx_strn(&cr, 1);
 	    p = str;
-            mp_hal_stdout_tx_char(cr);
+            _stdout_tx_char_OUTOFGIL(cr);
         }
-        mp_hal_stdout_tx_char(*str++);
+        _stdout_tx_char_OUTOFGIL(*str++);
     }
     dup_stdout_tx_strn(p, str - p);
     MP_THREAD_GIL_ENTER();

@@ -29,12 +29,12 @@
 #ifndef INCLUDED_MPHALPORT_H
 #define INCLUDED_MPHALPORT_H
 
-#include "py/ringbuf.h"
 #include "lib/utils/interrupt_char.h"
+#include "freertos/ringbuf.h"
 
-extern ringbuf_t stdin_ringbuf;
+#define STDIN_RINGBUF_SIZE_b		(16)
+extern RingbufHandle_t stdin_ringbuf;
 
-void mp_hal_stdin_dup(int (*rx_chr)(void));
 void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len));
 
 uint32_t mp_hal_ticks_us(void);

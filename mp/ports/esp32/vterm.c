@@ -36,11 +36,10 @@
 #include "vterm.h"
 
 #define BUFSIZE_b 		128
-#define PUSH_WAIT_tick		( 1000 / portTICK_PERIOD_MS)
-#define UNREG_WAIT_tick		( 1000 / portTICK_PERIOD_MS)
-#define RINGBUF_WAIT_tick	(60000 / portTICK_PERIOD_MS)
+#define PUSH_WAIT_tick		(1000 / portTICK_PERIOD_MS)
+#define UNREG_WAIT_tick		(1000 / portTICK_PERIOD_MS)
+#define RINGBUF_WAIT_tick	( 500 / portTICK_PERIOD_MS)
 #define IO_INTERVAL_us		(20 * 1000)
-#define RINGBUF_SIZE_b		(16)
 
 typedef struct _vterm_ops_t {
     bool nonblocking_read;
@@ -61,7 +60,6 @@ typedef struct _vterm_t {
     void (*unregister)(void *vctx);
     esp_timer_handle_t timer;
     SemaphoreHandle_t mutex;
-    RingbufHandle_t ringbuf;
     char s_buff[BUFSIZE_b];
     size_t s_size;
 } _vterm_t;
@@ -90,43 +88,37 @@ STATIC _vterm_t vterm = {
     .unregister = _vterm_unregister_noop,
 };
 
-STATIC void *_vterm_read_thread(void *__void)
+STATIC void _vterm_send_chars(uint8_t *p, ssize_t n)
 {
-    unsigned char buf[RINGBUF_SIZE_b];
+    for (; n--; p++) {
+	if (*p == mp_interrupt_char) {
+	    mp_keyboard_interrupt();
+	} else if (xRingbufferSend(stdin_ringbuf, p, 1, RINGBUF_WAIT_tick) != pdTRUE) {
+	    // drop input
+	}
+    }
+}
+
+STATIC void *_vterm_rx_thread(void *__void)
+{
+    uint8_t buf[8];
     for (;;) {
 	ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), false);
-	if (n > 0) {
-	    if (xRingbufferSend(vterm.ringbuf, buf, n, RINGBUF_WAIT_tick) != pdTRUE) {
-		// drop input
-	    }
-	}
-	if (n == -1)
+	if (n > 0)
+	    _vterm_send_chars(buf, n);
+	else if (n == -1)
 	    return 0;
     }
 }
 
-STATIC int mp_vterm_rx_by_thread(void)
+STATIC void _vterm_rx_nonblocking(bool in_gil)
 {
-    size_t n;
-    unsigned char *p = xRingbufferReceiveUpTo(vterm.ringbuf, &n, 0, 1);
-    if (p != 0) {
-	int c = *p;
-	vRingbufferReturnItem(vterm.ringbuf, p);
-	return c;
-    }
-    return -1;
-}
-
-STATIC int mp_vterm_rx_nonblocking(void)
-{
-    unsigned char buf[1];
-    ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), true);
+    uint8_t buf[8];
+    ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), in_gil);
     if (n > 0)
-	return buf[0];
-    if (n == -2)
-	return -1;
-    mp_vterm_unregister();
-    return -1;
+	_vterm_send_chars(buf, n);
+    else if (n != -2)		// NOT TIMEOUT
+	mp_vterm_unregister();
 }
 
 STATIC void _vterm_writeall(const char *data, uint32_t size, bool in_gil)
@@ -174,9 +166,10 @@ STATIC void _vterm_flush(bool in_gil)
     }
 }
 
-STATIC void mp_vterm_timered_flush(void *__arg)
+STATIC void mp_vterm_timered_io(void *__arg)
 {
     _vterm_flush(false);
+    _vterm_rx_nonblocking(false);
 }
 
 STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
@@ -193,7 +186,7 @@ STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
 	return false;
     }
 
-    if (vterm.buffered_write) {
+    if (vterm.buffered_write || vterm.nonblocking_read) {
 	if (vterm.timer == 0) {
 	    return false;
 	}
@@ -209,16 +202,9 @@ STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
     else
 	mp_hal_stdout_dup(mp_vterm_wr_direct);
 
-    if (vterm.nonblocking_read)
-	mp_hal_stdin_dup(mp_vterm_rx_nonblocking);
-    else {
-	size_t n;
-	void *p = xRingbufferReceive(vterm.ringbuf, &n, 0);
-	if (p != 0)
-	    vRingbufferReturnItem(vterm.ringbuf, p);
-	mp_hal_stdin_dup(mp_vterm_rx_by_thread);
+    if (!vterm.nonblocking_read) {
 	size_t stksize = vterm.stacksize_b;
-	mp_thread_create(_vterm_read_thread, 0, &stksize);
+	mp_thread_create(_vterm_rx_thread, 0, &stksize);
     }
 
     return true;
@@ -238,7 +224,6 @@ void mp_vterm_unregister(void)
     vterm.read = _vterm_read_noop;
     vterm.write = _vterm_write_noop;
     vterm.unregister = _vterm_unregister_noop;
-    mp_hal_stdin_dup(0);
     mp_hal_stdout_dup(0);
     unregister(vterm.vctx);
     vterm.s_size = 0;
@@ -251,9 +236,8 @@ void mp_vterm_init(void)
 {
     if (vterm.mutex == 0) {
 	vterm.mutex = xSemaphoreCreateMutex();
-	vterm.ringbuf = xRingbufferCreate(RINGBUF_SIZE_b, RINGBUF_TYPE_BYTEBUF);
 	esp_timer_create_args_t args = {
-	    .callback = mp_vterm_timered_flush,
+	    .callback = mp_vterm_timered_io,
 	    .arg = 0,
 	    .dispatch_method = ESP_TIMER_TASK,
 	    .name = "airterm",

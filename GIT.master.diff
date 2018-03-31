@@ -1,3 +1,128 @@
+diff --git a/extmod/modgenstream.c b/extmod/modgenstream.c
+new file mode 100644
+index 00000000..f1e28a7f
+--- /dev/null
++++ b/extmod/modgenstream.c
+@@ -0,0 +1,109 @@
++/*
++ * This file is part of the MicroPython project, http://micropython.org/
++ *
++ * The MIT License (MIT)
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#include <stdio.h>
++#include <stdint.h>
++#include <string.h>
++
++#include "py/objstr.h"
++#include "py/runtime.h"
++#include "py/stream.h"
++#include "extmod/modgenstream.h"
++
++#if MICROPY_PY_GENSTREAM
++
++typedef struct _mp_obj_genstream_t {
++    mp_obj_base_t base;
++} mp_obj_genstream_t;
++
++STATIC mp_obj_t genstream_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
++    //mp_arg_check_num(n_args, n_kw, 0, 0, false);
++    mp_obj_genstream_t *o = m_new_obj(mp_obj_genstream_t);
++    o->base.type = type;
++    return  MP_OBJ_FROM_PTR(o);
++}
++
++STATIC mp_uint_t genstream_read(mp_obj_t self_in, void *buf, mp_uint_t size, int *errcode) {
++    mp_obj_genstream_t *self =  MP_OBJ_TO_PTR(self_in);
++    mp_obj_t meth[3];
++    mp_load_method(self, MP_QSTR_read, meth);
++    meth[2] = mp_obj_new_int(size);
++
++    mp_obj_t ret;
++    nlr_buf_t nlr;
++    if (nlr_push(&nlr) == 0) {
++	ret = mp_call_method_n_kw(1, 0, meth);
++	nlr_pop();
++    } else {
++	*errcode = MP_EIO;
++	return MP_STREAM_ERROR;
++    }
++    const char *data = mp_obj_str_get_data(ret, &size);
++    (void)memcpy(buf, data, size);
++    return size;
++}
++
++STATIC mp_uint_t genstream_write(mp_obj_t self_in, const void *buf, mp_uint_t size, int *errcode) {
++    mp_obj_genstream_t *self =  MP_OBJ_TO_PTR(self_in);
++    mp_obj_t meth[3];
++    mp_load_method(self, MP_QSTR_write, meth);
++    meth[2] = mp_obj_new_str_of_type(&mp_type_bytes, buf, size);
++
++    mp_obj_t ret;
++    nlr_buf_t nlr;
++    if (nlr_push(&nlr) == 0) {
++	ret = mp_call_method_n_kw(1, 0, meth);
++	nlr_pop();
++    } else {
++	*errcode = MP_EIO;
++	return MP_STREAM_ERROR;
++    }
++    return mp_obj_get_int(ret);
++}
++
++STATIC const mp_stream_p_t genstream_stream_p = {
++    .read = genstream_read,
++    .write = genstream_write,
++};
++
++STATIC const mp_obj_type_t genstream_type = {
++    { &mp_type_type },
++    .name = MP_QSTR_genstream,
++    .make_new = genstream_make_new,
++    .protocol = &genstream_stream_p,
++};
++
++STATIC const mp_rom_map_elem_t genstream_module_globals_table[] = {
++    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_genstream) },
++    { MP_ROM_QSTR(MP_QSTR_genstream), MP_ROM_PTR(&genstream_type) },
++};
++
++STATIC MP_DEFINE_CONST_DICT(genstream_module_globals, genstream_module_globals_table);
++
++const mp_obj_module_t mp_module_genstream = {
++    .base = { &mp_type_module },
++    .globals = (mp_obj_dict_t*)&genstream_module_globals,
++};
++
++#endif // MICROPY_PY_GENSTREAM
+diff --git a/extmod/modgenstream.h b/extmod/modgenstream.h
+new file mode 100644
+index 00000000..983911af
+--- /dev/null
++++ b/extmod/modgenstream.h
+@@ -0,0 +1,4 @@
++#ifndef MICROPY_INCLUDED_EXTMOD_MODGENSTREAM_H
++#define MICROPY_INCLUDED_EXTMOD_MODGENSTREAM_H
++
++#endif // MICROPY_INCLUDED_EXTMOD_MODGENSTREAM_H
 diff --git a/extmod/vfs.c b/extmod/vfs.c
 index 0585de1c..af31e628 100644
 --- a/extmod/vfs.c
@@ -139,6 +264,125 @@ index 31d15396..5abc44d0 100644
  };
  
  STATIC MP_DEFINE_CONST_DICT(mp_module_socket_globals, mp_module_socket_globals_table);
+diff --git a/ports/esp32/modules/webrepl.py b/ports/esp32/modules/webrepl.py
+new file mode 100644
+index 00000000..ee11312b
+--- /dev/null
++++ b/ports/esp32/modules/webrepl.py
+@@ -0,0 +1,97 @@
++# This module should be imported from REPL, not run from command line.
++import sys
++import socket
++import uos
++import network
++import websocket
++import websocket_helper
++import _webrepl
++import machine
++
++listen_s = None
++client_s = None
++timer = None
++
++def setup_conn(port, accept_handler):
++    global listen_s
++    listen_s = socket.socket()
++    listen_s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
++
++    ai = socket.getaddrinfo("0.0.0.0", port)
++    addr = ai[0][4]
++
++    listen_s.bind(addr)
++    listen_s.listen(1)
++    if accept_handler:
++        listen_s.setblocking(False)
++        def manage(*args):
++            global client_s
++            try:
++                if client_s and client_s.fileno() == -1:
++                    client_s = None
++                    uos.dupterm(None)
++            except:
++                pass
++            try:
++                accept_conn(listen_s)
++            except:
++                pass
++        global timer
++        timer = machine.Timer(0)
++        timer.init(period=2000, mode=1, callback=manage)
++    for i in (network.AP_IF, network.STA_IF):
++        iface = network.WLAN(i)
++        if iface.active():
++            print("WebREPL daemon started on ws://%s:%d" % (iface.ifconfig()[0], port))
++    return listen_s
++
++
++def accept_conn(listen_sock):
++    global client_s
++    cl, remote_addr = listen_sock.accept()
++    prev = uos.dupterm(None)
++    uos.dupterm(prev)
++    if prev:
++        print("\nConcurrent WebREPL connection from", remote_addr, "rejected")
++        cl.close()
++        return
++    print("\nWebREPL connection from:", remote_addr)
++    client_s = cl
++    websocket_helper.server_handshake(cl)
++    ws = websocket.websocket(cl, True)
++    ws = _webrepl._webrepl(ws)
++    cl.setblocking(False)
++    uos.dupterm(ws)
++
++
++def stop():
++    global listen_s, client_s
++    uos.dupterm(None)
++    if client_s:
++        client_s.close()
++    if listen_s:
++        listen_s.close()
++    if timer:
++        timer.deinit()
++
++
++def start(port=8266, password=None):
++    stop()
++    if password is None:
++        try:
++            import webrepl_cfg
++            _webrepl.password(webrepl_cfg.PASS)
++            setup_conn(port, accept_conn)
++            print("Started webrepl in normal mode")
++        except:
++            print("WebREPL is not configured, run 'import webrepl_setup'")
++    else:
++        _webrepl.password(password)
++        setup_conn(port, accept_conn)
++        print("Started webrepl in manual override mode")
++
++
++def start_foreground(port=8266):
++    stop()
++    s = setup_conn(port, None)
++    accept_conn(s)
+diff --git a/ports/esp32/modules/webrepl_setup.py b/ports/esp32/modules/webrepl_setup.py
+new file mode 120000
+index 00000000..999888bf
+--- /dev/null
++++ b/ports/esp32/modules/webrepl_setup.py
+@@ -0,0 +1 @@
++../../esp8266/modules/webrepl_setup.py
+\ No newline at end of file
+diff --git a/ports/esp32/modules/websocket_helper.py b/ports/esp32/modules/websocket_helper.py
+new file mode 120000
+index 00000000..4bcf3bcb
+--- /dev/null
++++ b/ports/esp32/modules/websocket_helper.py
+@@ -0,0 +1 @@
++../../esp8266/modules/websocket_helper.py
+\ No newline at end of file
 diff --git a/ports/esp32/moduos.c b/ports/esp32/moduos.c
 index 9f0e291a..587e649e 100644
 --- a/ports/esp32/moduos.c
@@ -222,7 +466,7 @@ index 80594b11..9f440021 100644
  // fatfs configuration
  #define MICROPY_FATFS_ENABLE_LFN            (1)
 diff --git a/ports/esp32/mphalport.c b/ports/esp32/mphalport.c
-index e588fc65..89eb0f69 100644
+index e588fc65..df3432fc 100644
 --- a/ports/esp32/mphalport.c
 +++ b/ports/esp32/mphalport.c
 @@ -27,6 +27,7 @@
@@ -233,67 +477,67 @@ index e588fc65..89eb0f69 100644
  #include <sys/time.h>
  
  #include "freertos/FreeRTOS.h"
-@@ -42,12 +43,38 @@
- STATIC uint8_t stdin_ringbuf_array[256];
- ringbuf_t stdin_ringbuf = {stdin_ringbuf_array, sizeof(stdin_ringbuf_array)};
+@@ -39,13 +40,24 @@
+ #include "extmod/misc.h"
+ #include "lib/utils/pyexec.h"
  
-+static int noop_stdin_rx_chr(void)
-+{
-+    return -1;
-+}
-+
+-STATIC uint8_t stdin_ringbuf_array[256];
+-ringbuf_t stdin_ringbuf = {stdin_ringbuf_array, sizeof(stdin_ringbuf_array)};
 +static void noop_stdout_tx_strn(const char *str, uint32_t len)
 +{
 +}
 +
-+static int (*dup_stdin_rx_chr)(void) = noop_stdin_rx_chr;
 +static void (*dup_stdout_tx_strn)(const char *str, uint32_t len) = noop_stdout_tx_strn;
-+
-+void mp_hal_stdin_dup(int (*rx_chr)(void))
-+{
-+    dup_stdin_rx_chr = rx_chr ? rx_chr : noop_stdin_rx_chr;
-+}
 +
 +void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len))
 +{
 +    dup_stdout_tx_strn = tx_strn ? tx_strn : noop_stdout_tx_strn;
 +}
-+
+ 
  int mp_hal_stdin_rx_chr(void) {
      for (;;) {
-         int c = ringbuf_get(&stdin_ringbuf);
-         if (c != -1) {
+-        int c = ringbuf_get(&stdin_ringbuf);
+-        if (c != -1) {
++	size_t n;
++	unsigned char *p = xRingbufferReceiveUpTo(stdin_ringbuf, &n, 0, 1);
++	if (p) {
++	    int c = *p;
++	    vRingbufferReturnItem(stdin_ringbuf, p);
              return c;
          }
-+	c = dup_stdin_rx_chr();
-+        if (c != -1) {
-+            return c;
-+        }
          MICROPY_EVENT_POLL_HOOK
-         vTaskDelay(1);
+@@ -53,35 +65,47 @@ int mp_hal_stdin_rx_chr(void) {
      }
-@@ -55,11 +82,11 @@ int mp_hal_stdin_rx_chr(void) {
+ }
  
++#define _stdout_tx_char_OUTOFGIL(c)	uart_tx_one_char(c)
++
  void mp_hal_stdout_tx_char(char c) {
++    MP_THREAD_GIL_EXIT();
++    dup_stdout_tx_strn(&c, 1);
      uart_tx_one_char(c);
 -    //mp_uos_dupterm_tx_strn(&c, 1);
++    MP_THREAD_GIL_ENTER();
  }
  
  void mp_hal_stdout_tx_str(const char *str) {
      MP_THREAD_GIL_EXIT();
 +    dup_stdout_tx_strn(str, strlen(str));
      while (*str) {
-         mp_hal_stdout_tx_char(*str++);
+-        mp_hal_stdout_tx_char(*str++);
++        _stdout_tx_char_OUTOFGIL(*str++);
      }
-@@ -68,6 +95,7 @@ void mp_hal_stdout_tx_str(const char *str) {
+     MP_THREAD_GIL_ENTER();
+ }
  
  void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
      MP_THREAD_GIL_EXIT();
 +    dup_stdout_tx_strn(str, len);
      while (len--) {
-         mp_hal_stdout_tx_char(*str++);
+-        mp_hal_stdout_tx_char(*str++);
++        _stdout_tx_char_OUTOFGIL(*str++);
      }
-@@ -75,13 +103,19 @@ void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
+     MP_THREAD_GIL_ENTER();
  }
  
  void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
@@ -306,28 +550,35 @@ index e588fc65..89eb0f69 100644
 +	    dup_stdout_tx_strn(p, str - p);
 +	    dup_stdout_tx_strn(&cr, 1);
 +	    p = str;
-+            mp_hal_stdout_tx_char(cr);
++            _stdout_tx_char_OUTOFGIL(cr);
          }
-         mp_hal_stdout_tx_char(*str++);
+-        mp_hal_stdout_tx_char(*str++);
++        _stdout_tx_char_OUTOFGIL(*str++);
      }
 +    dup_stdout_tx_strn(p, str - p);
      MP_THREAD_GIL_ENTER();
  }
  
 diff --git a/ports/esp32/mphalport.h b/ports/esp32/mphalport.h
-index 3215bc06..0811f2af 100644
+index 3215bc06..5650925f 100644
 --- a/ports/esp32/mphalport.h
 +++ b/ports/esp32/mphalport.h
-@@ -34,6 +34,9 @@
+@@ -29,10 +29,13 @@
+ #ifndef INCLUDED_MPHALPORT_H
+ #define INCLUDED_MPHALPORT_H
  
- extern ringbuf_t stdin_ringbuf;
+-#include "py/ringbuf.h"
+ #include "lib/utils/interrupt_char.h"
++#include "freertos/ringbuf.h"
  
-+void mp_hal_stdin_dup(int (*rx_chr)(void));
-+void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len));
+-extern ringbuf_t stdin_ringbuf;
++#define STDIN_RINGBUF_SIZE_b		(16)
++extern RingbufHandle_t stdin_ringbuf;
 +
++void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len));
+ 
  uint32_t mp_hal_ticks_us(void);
  __attribute__((always_inline)) static inline uint32_t mp_hal_ticks_cpu(void) {
-   uint32_t ccount;
 diff --git a/ports/esp32/mpthreadport.c b/ports/esp32/mpthreadport.c
 index 76d9431c..54b324ff 100644
 --- a/ports/esp32/mpthreadport.c
@@ -356,6 +607,475 @@ index 113c0395..2bf86363 100644
  #define CONFIG_LWIP_SO_REUSE 1
  #define CONFIG_LWIP_ETHARP_TRUST_IP_MAC 1
  #define CONFIG_IP_LOST_TIMER_INTERVAL 120
+diff --git a/ports/esp32/uart.c b/ports/esp32/uart.c
+index 10a4ba46..ac66bf46 100644
+--- a/ports/esp32/uart.c
++++ b/ports/esp32/uart.c
+@@ -33,10 +33,13 @@
+ #include "py/mpstate.h"
+ #include "py/mphal.h"
+ 
++RingbufHandle_t stdin_ringbuf;
++
+ STATIC void uart_irq_handler(void *arg);
+ 
+ void uart_init(void) {
+     uart_isr_handle_t handle;
++    stdin_ringbuf = xRingbufferCreate(STDIN_RINGBUF_SIZE_b, RINGBUF_TYPE_BYTEBUF);
+     uart_isr_register(UART_NUM_0, uart_irq_handler, NULL, ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_IRAM, &handle);
+     uart_enable_rx_intr(UART_NUM_0);
+ }
+@@ -58,8 +61,8 @@ STATIC void IRAM_ATTR uart_irq_handler(void *arg) {
+             }
+             #endif
+         } else {
+-            // this is an inline function so will be in IRAM
+-            ringbuf_put(&stdin_ringbuf, c);
++	    BaseType_t __dummy = pdFALSE;
++	    (void)xRingbufferSendFromISR(stdin_ringbuf, &c, sizeof(c), &__dummy);
+         }
+     }
+ }
+diff --git a/ports/esp32/vterm.c b/ports/esp32/vterm.c
+new file mode 100644
+index 00000000..16c73cef
+--- /dev/null
++++ b/ports/esp32/vterm.c
+@@ -0,0 +1,396 @@
++/*
++ * This file is part of the MicroPython project, http://micropython.org/
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "freertos/FreeRTOS.h"
++#include "freertos/semphr.h"
++#include "freertos/ringbuf.h"
++#include "esp_timer.h"
++#include "mphalport.h"
++#include "lwip/sockets.h"
++#include "py/stream.h"
++#include "py/mpthread.h"
++
++#include "vterm.h"
++
++#define BUFSIZE_b 		128
++#define PUSH_WAIT_tick		(1000 / portTICK_PERIOD_MS)
++#define UNREG_WAIT_tick		(1000 / portTICK_PERIOD_MS)
++#define RINGBUF_WAIT_tick	( 500 / portTICK_PERIOD_MS)
++#define IO_INTERVAL_us		(20 * 1000)
++
++typedef struct _vterm_ops_t {
++    bool nonblocking_read;
++    bool buffered_write;
++    int stacksize_b;		// blocking read thread
++    ssize_t (*read)(void *vctx, void *buf, size_t n, bool in_gil);
++    ssize_t (*write)(void *vctx, const void *buf, size_t n, bool in_gil);
++    void (*unregister)(void *vctx);
++} _vterm_ops_t;
++
++typedef struct _vterm_t {
++    void *vctx;
++    bool nonblocking_read;
++    bool buffered_write;
++    int stacksize_b;		// blocking read thread
++    ssize_t (*read)(void *vctx, void *buf, size_t n, bool in_gil);
++    ssize_t (*write)(void *vctx, const void *buf, size_t n, bool in_gil);
++    void (*unregister)(void *vctx);
++    esp_timer_handle_t timer;
++    SemaphoreHandle_t mutex;
++    char s_buff[BUFSIZE_b];
++    size_t s_size;
++} _vterm_t;
++
++
++//----------------------------------------------------------------------------
++//----------------------------------------------------------------------------
++
++STATIC ssize_t _vterm_read_noop(void *vctx, void *buf, size_t n, bool in_gil)
++{
++    return -1;
++}
++
++STATIC ssize_t _vterm_write_noop(void *vctx, const void *buf, size_t n, bool in_gil)
++{
++    return -1;
++}
++
++STATIC void _vterm_unregister_noop(void *vctx)
++{
++}
++
++STATIC _vterm_t vterm = {
++    .read = _vterm_read_noop,
++    .write = _vterm_write_noop,
++    .unregister = _vterm_unregister_noop,
++};
++
++STATIC void _vterm_send_chars(uint8_t *p, ssize_t n)
++{
++    for (; n--; p++) {
++	if (*p == mp_interrupt_char) {
++	    mp_keyboard_interrupt();
++	} else if (xRingbufferSend(stdin_ringbuf, p, 1, RINGBUF_WAIT_tick) != pdTRUE) {
++	    // drop input
++	}
++    }
++}
++
++STATIC void *_vterm_rx_thread(void *__void)
++{
++    uint8_t buf[8];
++    for (;;) {
++	ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), false);
++	if (n > 0)
++	    _vterm_send_chars(buf, n);
++	else if (n == -1)
++	    return 0;
++    }
++}
++
++STATIC void _vterm_rx_nonblocking(bool in_gil)
++{
++    uint8_t buf[8];
++    ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), in_gil);
++    if (n > 0)
++	_vterm_send_chars(buf, n);
++    else if (n != -2)		// NOT TIMEOUT
++	mp_vterm_unregister();
++}
++
++STATIC void _vterm_writeall(const char *data, uint32_t size, bool in_gil)
++{
++    while (size > 0) {
++	int n = vterm.write(vterm.vctx, data, size, in_gil);
++	if (n < 0) {
++	    mp_vterm_unregister();
++	    return;
++	}
++	data += n;
++	size -= n;
++    }
++}
++
++STATIC void mp_vterm_wr_direct(const char *data, uint32_t size)
++{
++    return _vterm_writeall(data, size, false);
++}
++
++STATIC void mp_vterm_wx_buffer(const char *data, uint32_t size)
++{
++    if (xSemaphoreTake(vterm.mutex, PUSH_WAIT_tick) == pdFALSE) {
++	return;
++    }
++    if (vterm.s_size + size > BUFSIZE_b) {
++	_vterm_writeall(vterm.s_buff, vterm.s_size, false);
++	_vterm_writeall(data, size, false);
++	vterm.s_size = 0;
++    } else {
++	(void)memcpy(&vterm.s_buff[vterm.s_size], data, size);
++	vterm.s_size += size;
++    }
++    xSemaphoreGive(vterm.mutex);
++}
++
++STATIC void _vterm_flush(bool in_gil)
++{
++    if (xSemaphoreTake(vterm.mutex, 0) == pdTRUE) {
++	if (vterm.s_size != 0) {
++	    _vterm_writeall(vterm.s_buff, vterm.s_size, in_gil);
++	    vterm.s_size = 0;
++	}
++	xSemaphoreGive(vterm.mutex);
++    }
++}
++
++STATIC void mp_vterm_timered_io(void *__arg)
++{
++    _vterm_flush(false);
++    _vterm_rx_nonblocking(false);
++}
++
++STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
++{
++    vterm.vctx = vctx;
++    vterm.nonblocking_read = ops->nonblocking_read;
++    vterm.buffered_write = ops->buffered_write;
++    vterm.write = ops->write;
++    vterm.read = ops->read;
++    vterm.unregister = ops->unregister;
++    vterm.s_size = 0;
++
++    if (vterm.mutex == 0) {
++	return false;
++    }
++
++    if (vterm.buffered_write || vterm.nonblocking_read) {
++	if (vterm.timer == 0) {
++	    return false;
++	}
++	if (esp_timer_start_periodic(vterm.timer, IO_INTERVAL_us) != ESP_OK) {
++	    esp_timer_delete(vterm.timer);
++	    vterm.timer = 0;
++	    return false;
++	}
++    }
++
++    if (vterm.buffered_write)
++	mp_hal_stdout_dup(mp_vterm_wx_buffer);
++    else
++	mp_hal_stdout_dup(mp_vterm_wr_direct);
++
++    if (!vterm.nonblocking_read) {
++	size_t stksize = vterm.stacksize_b;
++	mp_thread_create(_vterm_rx_thread, 0, &stksize);
++    }
++
++    return true;
++}
++
++void mp_vterm_unregister(void)
++{
++    if (vterm.buffered_write)
++	esp_timer_stop(vterm.timer);
++
++    bool do_unlock = true;
++    if (xSemaphoreTake(vterm.mutex, UNREG_WAIT_tick) == pdFALSE) {
++	do_unlock = false;
++    }
++
++    void (*unregister)(void *vctx) = vterm.unregister;
++    vterm.read = _vterm_read_noop;
++    vterm.write = _vterm_write_noop;
++    vterm.unregister = _vterm_unregister_noop;
++    mp_hal_stdout_dup(0);
++    unregister(vterm.vctx);
++    vterm.s_size = 0;
++
++    if (do_unlock)
++	xSemaphoreGive(vterm.mutex);
++}
++
++void mp_vterm_init(void)
++{
++    if (vterm.mutex == 0) {
++	vterm.mutex = xSemaphoreCreateMutex();
++	esp_timer_create_args_t args = {
++	    .callback = mp_vterm_timered_io,
++	    .arg = 0,
++	    .dispatch_method = ESP_TIMER_TASK,
++	    .name = "airterm",
++	};
++	esp_timer_create(&args, &vterm.timer);
++    }
++}
++
++//----------------------------------------------------------------------------
++//             airterm - LWIP socket level terminal duplication
++//----------------------------------------------------------------------------
++
++typedef struct _airterm_ctx_t {
++    int socket;
++} _airterm_ctx_t;
++
++static _airterm_ctx_t airterm_ctx;
++
++STATIC ssize_t airterm_read(void *__vctx, void *buf, size_t n, bool in_gil)
++{
++    _airterm_ctx_t *ctx = __vctx;
++    ssize_t z = lwip_recvfrom_r(ctx->socket, buf, n, MSG_DONTWAIT, 0, 0);
++    if (z == -1 && errno == EWOULDBLOCK)
++	z = -2;
++    return z;
++}
++
++STATIC ssize_t airterm_write(void *__vctx, const void *buf, size_t n, bool in_gil)
++{
++    _airterm_ctx_t *ctx = __vctx;
++    if (in_gil)
++	MP_THREAD_GIL_EXIT();
++    ssize_t z = lwip_send_r(ctx->socket, buf, n, 0);
++    if (in_gil)
++	MP_THREAD_GIL_ENTER();
++    return z;
++}
++
++STATIC void airterm_unregister(void *__vctx)
++{
++    _airterm_ctx_t *ctx = __vctx;
++    if (ctx->socket != -1) {
++	lwip_close_r(ctx->socket);
++    }
++    ctx->socket = -1;
++}
++
++bool mp_vterm_register_airterm(int socket)
++{
++    //int enable = 1;
++    //lwip_setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(enable));
++    airterm_ctx.socket = socket;
++
++    _vterm_ops_t ops = {
++	.nonblocking_read = true,
++	.buffered_write = true,
++	.read = airterm_read,
++	.write = airterm_write,
++	.unregister = airterm_unregister,
++    };
++
++    return mp_vterm_register(&airterm_ctx, &ops);
++}
++
++//----------------------------------------------------------------------------
++//              dupterm - altenative os.dupterm implementation
++//----------------------------------------------------------------------------
++
++typedef struct _dupterm_ctx_t {
++    mp_obj_t stream;
++} _dupterm_ctx_t;
++
++static _dupterm_ctx_t dupterm_ctx;
++
++STATIC ssize_t dupterm_read_nonblocking(void *__vctx, void *buf, size_t n, bool in_gil)
++{
++    _dupterm_ctx_t *ctx = __vctx;
++    int flag = MP_STREAM_RW_READ|MP_STREAM_RW_ONCE;
++    int errcode, z;
++    if (!in_gil)
++	MP_THREAD_GIL_ENTER();
++    z = mp_stream_rw(ctx->stream, buf, 1, &errcode, flag);
++    if (!in_gil)
++	MP_THREAD_GIL_EXIT();
++    if (errcode == 0)
++	return z;
++    if (errcode == MP_EWOULDBLOCK)
++	return -2;
++    return -1;
++}
++
++STATIC ssize_t dupterm_read(void *__vctx, void *buf, size_t n, bool in_gil)
++{
++    _dupterm_ctx_t *ctx = __vctx;
++    int flag = MP_STREAM_RW_READ|MP_STREAM_RW_ONCE;
++    int errcode, z;
++    if (!in_gil)
++	MP_THREAD_GIL_ENTER();
++    do {
++	z = mp_stream_rw(ctx->stream, buf, 1, &errcode, flag);
++    } while (errcode == MP_EWOULDBLOCK);
++    if (!in_gil)
++	MP_THREAD_GIL_EXIT();
++    if (errcode == 0)
++	return z;
++    return -1;
++}
++
++STATIC ssize_t dupterm_write(void *__vctx, const void *buf, size_t n, bool in_gil)
++{
++    _dupterm_ctx_t *ctx = __vctx;
++    int errcode;
++    size_t z;
++    if (!in_gil)
++	MP_THREAD_GIL_ENTER();
++    z = mp_stream_rw(ctx->stream, (void *)buf, n, &errcode, MP_STREAM_RW_WRITE);
++    if (!in_gil)
++	MP_THREAD_GIL_EXIT();
++    if (errcode == 0)
++	return z;
++    return -1;
++}
++
++STATIC void dupterm_unregister(void *__vctx)
++{
++    _dupterm_ctx_t *ctx = __vctx;
++    (void)mp_stream_close(ctx->stream);
++    ctx->stream = 0;
++}
++
++bool mp_vterm_register_dupterm_nonblocking(mp_obj_t stream)
++{
++    _vterm_ops_t ops = {
++	.nonblocking_read = true,
++	.buffered_write = true,
++	.read = dupterm_read_nonblocking,
++	.write = dupterm_write,
++	.unregister = dupterm_unregister,
++    };
++    dupterm_ctx.stream = stream;
++    return mp_vterm_register(&dupterm_ctx, &ops);
++}
++
++bool mp_vterm_register_dupterm(mp_obj_t stream, int stacksize_b)
++{
++    _vterm_ops_t ops = {
++	.nonblocking_read = false,
++	.buffered_write = true,
++	.stacksize_b = stacksize_b,
++	.read = dupterm_read,
++	.write = dupterm_write,
++	.unregister = dupterm_unregister,
++    };
++    dupterm_ctx.stream = stream;
++    return mp_vterm_register(&dupterm_ctx, &ops);
++}
+diff --git a/ports/esp32/vterm.h b/ports/esp32/vterm.h
+new file mode 100644
+index 00000000..371d61d4
+--- /dev/null
++++ b/ports/esp32/vterm.h
+@@ -0,0 +1,32 @@
++/*
++ * This file is part of the MicroPython project, http://micropython.org/
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#ifndef INCLUDED_VTERM_H
++#define INCLUDED_VTERM_H
++
++void mp_vterm_init(void);
++bool mp_vterm_register_airterm(int socket);
++bool mp_vterm_register_dupterm_nonblocking(mp_obj_t stream);
++bool mp_vterm_register_dupterm(mp_obj_t stream, int stacksize_b);
++void mp_vterm_unregister(void);
++
++#endif // INCLUDED_VTERM_H
 diff --git a/py/builtin.h b/py/builtin.h
 index 84b99a8a..9c566b4f 100644
 --- a/py/builtin.h
