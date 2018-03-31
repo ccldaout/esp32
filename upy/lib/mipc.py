@@ -243,7 +243,6 @@ class _AutoReply(object):
             self._autoreply_names = set()
             return target
         else:
-            target = target	##### DON'T REMOVE THIS ASSIGNMENT #####
             def wrapper(svc_self, port, msg):	# args: self, port, msg
                 reply = msg[0] + '_reply'
                 try:
@@ -253,7 +252,8 @@ class _AutoReply(object):
                     port.send([reply, False, str(e)])
                     _print_exception(e)
             self._autoreply_names.add(target.__name__)
-            wrapper.__name__ = target.__name__
+            #### A closure object has no attribute '__name__' in MycroPython.
+            #wrapper.__name__ = target.__name__
             return wrapper
 
     def decorator_noreply(self, target):
