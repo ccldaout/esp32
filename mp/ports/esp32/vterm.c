@@ -30,6 +30,9 @@
 #include "esp_timer.h"
 #include "mphalport.h"
 #include "lwip/sockets.h"
+#include "py/nlr.h"
+#include "py/builtin.h"
+#include "py/runtime.h"
 #include "py/stream.h"
 #include "py/mpthread.h"
 
@@ -42,9 +45,8 @@
 #define IO_INTERVAL_us		(20 * 1000)
 
 typedef struct _vterm_ops_t {
-    bool nonblocking_read;
+    bool timered_read;
     bool buffered_write;
-    int stacksize_b;		// blocking read thread
     ssize_t (*read)(void *vctx, void *buf, size_t n, bool in_gil);
     ssize_t (*write)(void *vctx, const void *buf, size_t n, bool in_gil);
     void (*unregister)(void *vctx);
@@ -52,9 +54,8 @@ typedef struct _vterm_ops_t {
 
 typedef struct _vterm_t {
     void *vctx;
-    bool nonblocking_read;
+    bool timered_read;
     bool buffered_write;
-    int stacksize_b;		// blocking read thread
     ssize_t (*read)(void *vctx, void *buf, size_t n, bool in_gil);
     ssize_t (*write)(void *vctx, const void *buf, size_t n, bool in_gil);
     void (*unregister)(void *vctx);
@@ -88,7 +89,7 @@ STATIC _vterm_t vterm = {
     .unregister = _vterm_unregister_noop,
 };
 
-STATIC void _vterm_send_chars(uint8_t *p, ssize_t n)
+STATIC void _vterm_rx_chars(uint8_t *p, ssize_t n)
 {
     for (; n--; p++) {
 	if (*p == mp_interrupt_char) {
@@ -99,24 +100,36 @@ STATIC void _vterm_send_chars(uint8_t *p, ssize_t n)
     }
 }
 
-STATIC void *_vterm_rx_thread(void *__void)
+STATIC void *__vterm_rx_thread(void *__in_gil)
 {
     uint8_t buf[8];
+    bool in_gil = (bool)__in_gil;
     for (;;) {
-	ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), false);
-	if (n > 0)
-	    _vterm_send_chars(buf, n);
-	else if (n == -1)
-	    return 0;
+	nlr_buf_t nlr;
+	if (nlr_push(&nlr) == 0) {
+	    ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), in_gil);
+	    nlr_pop();
+	    if (n > 0)
+		_vterm_rx_chars(buf, n);
+	    else if (n == -1)
+		return 0;
+	}
     }
 }
 
-STATIC void _vterm_rx_nonblocking(bool in_gil)
+STATIC mp_obj_t _vterm_rx_thread(void)
+{
+    (void)__vterm_rx_thread((void *)true);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(_vterm_rx_thread_obj, _vterm_rx_thread);
+
+STATIC void _vterm_rx_timered(bool in_gil)
 {
     uint8_t buf[8];
     ssize_t n = vterm.read(vterm.vctx, buf, sizeof(buf), in_gil);
     if (n > 0)
-	_vterm_send_chars(buf, n);
+	_vterm_rx_chars(buf, n);
     else if (n != -2)		// NOT TIMEOUT
 	mp_vterm_unregister();
 }
@@ -168,14 +181,16 @@ STATIC void _vterm_flush(bool in_gil)
 
 STATIC void mp_vterm_timered_io(void *__arg)
 {
-    _vterm_flush(false);
-    _vterm_rx_nonblocking(false);
+    if (vterm.buffered_write)
+	_vterm_flush(false);
+    if (vterm.timered_read)
+	_vterm_rx_timered(false);
 }
 
 STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
 {
     vterm.vctx = vctx;
-    vterm.nonblocking_read = ops->nonblocking_read;
+    vterm.timered_read = ops->timered_read;
     vterm.buffered_write = ops->buffered_write;
     vterm.write = ops->write;
     vterm.read = ops->read;
@@ -186,7 +201,7 @@ STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
 	return false;
     }
 
-    if (vterm.buffered_write || vterm.nonblocking_read) {
+    if (vterm.buffered_write || vterm.timered_read) {
 	if (vterm.timer == 0) {
 	    return false;
 	}
@@ -197,22 +212,33 @@ STATIC bool mp_vterm_register(void *vctx, const _vterm_ops_t *ops)
 	}
     }
 
+    if (!vterm.timered_read) {
+	mp_obj_t mod = MP_OBJ_FROM_PTR(&mp_module_thread);
+	mp_obj_t fun = mp_load_attr(mod, MP_QSTR_start_new_thread);
+	mp_obj_t trg = MP_OBJ_FROM_PTR(&_vterm_rx_thread_obj);
+	mp_obj_t args = mp_const_empty_tuple;
+	nlr_buf_t nlr;
+	if (nlr_push(&nlr) == 0) {
+	    mp_call_function_2(fun, trg, args);
+	    nlr_pop();
+	} else {
+	    if (vterm.buffered_write || vterm.timered_read)
+		esp_timer_stop(vterm.timer);
+	    return false;
+	}
+    }
+
     if (vterm.buffered_write)
 	mp_hal_stdout_dup(mp_vterm_wx_buffer);
     else
 	mp_hal_stdout_dup(mp_vterm_wr_direct);
-
-    if (!vterm.nonblocking_read) {
-	size_t stksize = vterm.stacksize_b;
-	mp_thread_create(_vterm_rx_thread, 0, &stksize);
-    }
 
     return true;
 }
 
 void mp_vterm_unregister(void)
 {
-    if (vterm.buffered_write)
+    if (vterm.buffered_write || vterm.timered_read)
 	esp_timer_stop(vterm.timer);
 
     bool do_unlock = true;
@@ -292,7 +318,7 @@ bool mp_vterm_register_airterm(int socket)
     airterm_ctx.socket = socket;
 
     _vterm_ops_t ops = {
-	.nonblocking_read = true,
+	.timered_read = true,
 	.buffered_write = true,
 	.read = airterm_read,
 	.write = airterm_write,
@@ -312,23 +338,6 @@ typedef struct _dupterm_ctx_t {
 
 static _dupterm_ctx_t dupterm_ctx;
 
-STATIC ssize_t dupterm_read_nonblocking(void *__vctx, void *buf, size_t n, bool in_gil)
-{
-    _dupterm_ctx_t *ctx = __vctx;
-    int flag = MP_STREAM_RW_READ|MP_STREAM_RW_ONCE;
-    int errcode, z;
-    if (!in_gil)
-	MP_THREAD_GIL_ENTER();
-    z = mp_stream_rw(ctx->stream, buf, 1, &errcode, flag);
-    if (!in_gil)
-	MP_THREAD_GIL_EXIT();
-    if (errcode == 0)
-	return z;
-    if (errcode == MP_EWOULDBLOCK)
-	return -2;
-    return -1;
-}
-
 STATIC ssize_t dupterm_read(void *__vctx, void *buf, size_t n, bool in_gil)
 {
     _dupterm_ctx_t *ctx = __vctx;
@@ -336,9 +345,12 @@ STATIC ssize_t dupterm_read(void *__vctx, void *buf, size_t n, bool in_gil)
     int errcode, z;
     if (!in_gil)
 	MP_THREAD_GIL_ENTER();
-    do {
+    for (;;) {
 	z = mp_stream_rw(ctx->stream, buf, 1, &errcode, flag);
-    } while (errcode == MP_EWOULDBLOCK);
+	if (errcode != MP_EWOULDBLOCK)
+	    break;
+        vTaskDelay(20/portTICK_PERIOD_MS);
+    }
     if (!in_gil)
 	MP_THREAD_GIL_EXIT();
     if (errcode == 0)
@@ -368,25 +380,11 @@ STATIC void dupterm_unregister(void *__vctx)
     ctx->stream = 0;
 }
 
-bool mp_vterm_register_dupterm_nonblocking(mp_obj_t stream)
+bool mp_vterm_register_dupterm(mp_obj_t stream, int __stacksize_b)
 {
     _vterm_ops_t ops = {
-	.nonblocking_read = true,
+	.timered_read = false,
 	.buffered_write = true,
-	.read = dupterm_read_nonblocking,
-	.write = dupterm_write,
-	.unregister = dupterm_unregister,
-    };
-    dupterm_ctx.stream = stream;
-    return mp_vterm_register(&dupterm_ctx, &ops);
-}
-
-bool mp_vterm_register_dupterm(mp_obj_t stream, int stacksize_b)
-{
-    _vterm_ops_t ops = {
-	.nonblocking_read = false,
-	.buffered_write = true,
-	.stacksize_b = stacksize_b,
 	.read = dupterm_read,
 	.write = dupterm_write,
 	.unregister = dupterm_unregister,

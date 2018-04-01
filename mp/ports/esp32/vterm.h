@@ -25,7 +25,6 @@
 
 void mp_vterm_init(void);
 bool mp_vterm_register_airterm(int socket);
-bool mp_vterm_register_dupterm_nonblocking(mp_obj_t stream);
 bool mp_vterm_register_dupterm(mp_obj_t stream, int stacksize_b);
 void mp_vterm_unregister(void);
 

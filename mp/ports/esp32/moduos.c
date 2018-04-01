@@ -96,18 +96,10 @@ STATIC mp_obj_t os_dupterm(size_t n_args, const mp_obj_t *args) {
 	;
     } else {
 	if (mp_get_stream_raise(args[0], MP_STREAM_OP_READ|MP_STREAM_OP_WRITE) != 0) {
-	    bool ret = false;
 	    prev_stream = args[0];
 	    mp_vterm_unregister();
-	    if (n_args == 3) {
-		mp_int_t thread_stack_size = mp_obj_get_int(args[2]);
-		if (thread_stack_size >= 0)
-		    ret = mp_vterm_register_dupterm(prev_stream, thread_stack_size);
-	    } else
-		ret = mp_vterm_register_dupterm_nonblocking(prev_stream);
-	    if (!ret) {
+	    if (!mp_vterm_register_dupterm(prev_stream, 0))
 		mp_raise_OSError(MP_EINVAL);
-	    }
 	}
     }
     return ret_stream;
