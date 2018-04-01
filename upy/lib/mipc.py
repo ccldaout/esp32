@@ -330,35 +330,41 @@ class _ServiceManager(object):
         if fd in self._ports:
             del self._ports[fd]
 
+    def _inner_loop(self):
+        for fobj, flag in self._poll.ipoll():
+            fd = fobj.fileno()
+            port, service_object = self._ports[fd]
+            if port.acceptable:
+                newport = None
+                try:
+                    newport = port.accept()
+                    service_object = service_object(port)
+                    self.register(newport, service_object)
+                    service_object.on_accepted(newport)
+                except Exception as e:
+                    _print_exception(e)
+                    if newport:
+                        self.unregister(newport)
+                        newport.close()
+            else:
+                try:
+                    msg = port.recv()
+                    service_object.mipc_received(port, msg)
+                except SocketClosed as e:
+                    self.unregister(port)
+                    service_object.on_disconnected(port)
+                    port.close()
+                except Exception as e:
+                    _print_exception(e)
+                    self.unregister(port)
+                    service_object.on_exception(port)
+                    port.close()
+
     def loop(self):
         while True:
-            for fobj, flag in self._poll.ipoll():
-                fd = fobj.fileno()
-                port, service_object = self._ports[fd]
-                if port.acceptable:
-                    newport = None
-                    try:
-                        newport = port.accept()
-                        service_object = service_object(port)
-                        self.register(newport, service_object)
-                        service_object.on_accepted(newport)
-                    except Exception as e:
-                        _print_exception(e)
-                        if newport:
-                            self.unregister(newport)
-                            newport.close()
-                else:
-                    try:
-                        msg = port.recv()
-                        service_object.mipc_received(port, msg)
-                    except SocketClosed as e:
-                        self.unregister(port)
-                        service_object.on_disconnected(port)
-                        port.close()
-                    except Exception as e:
-                        _print_exception(e)
-                        self.unregister(port)
-                        service_object.on_exception(port)
-                        port.close()
+            try:
+                self._inner_loop()
+            except KeyboardInterrupt:
+                pass
 
 manager = _ServiceManager()
