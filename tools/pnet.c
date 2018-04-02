@@ -141,12 +141,12 @@ int main(int argc, char **argv)
 {
     int sock;
 
-    if (argc != 3) {
-	(void)printf("Usage: pnet HOST PORT\n");
+    if (argc != 2) {
+	(void)printf("Usage: pnet HOST\n");
 	exit(EXIT_FAILURE);
     }
 
-    if ((SOCK = setuptcp(argv[1], strtol(argv[2], 0, 0))) == -1) {
+    if ((SOCK = setuptcp(argv[1], 2323)) == -1) {
 	(void)printf("error: %s\n", strerror(errno));
 	exit(EXIT_FAILURE);
     }
