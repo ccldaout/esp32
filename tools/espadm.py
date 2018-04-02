@@ -77,7 +77,7 @@ class AdminCommand(object):
     def service(self, modname):
         return self.cli.service(modname)
 
-IP_ADDRESS = os.getenv('ESP32_ADDR', '192.168.0.105')
+IP_ADDRESS = os.getenv('ESP32_ADDR', '192.168.0.151')
 
 admin = AdminCommand()
 admin.start(IP_ADDRESS)
