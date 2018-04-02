@@ -13,7 +13,10 @@ import sys
 import _thread
 
 def _thread_start(func, args, **kwargs):
-    return _thread.start_new_thread(func, args)
+    if hasattr(_thread, 'CPU_CORES'):
+        return _thread.start_new_thread(func, args, cpu_id=_thread.CPU_CORES-1)
+    else:
+        return _thread.start_new_thread(func, args)
 
 def _thread_getlock():
     return _thread.allocate_lock()

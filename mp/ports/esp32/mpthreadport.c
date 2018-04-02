@@ -115,7 +115,7 @@ STATIC void freertos_entry(void *arg) {
     for (;;);
 }
 
-void mp_thread_create_ex(void *(*entry)(void*), void *arg, size_t *stack_size, int priority, char *name) {
+void mp_thread_create_ex2(void *(*entry)(void*), void *arg, size_t *stack_size, int priority, char *name, int cpu_id) {
     // store thread entry function into a global variable so we can access it
     ext_thread_entry = entry;
 
@@ -133,7 +133,7 @@ void mp_thread_create_ex(void *(*entry)(void*), void *arg, size_t *stack_size, i
     mp_thread_mutex_lock(&thread_mutex, 1);
 
     // create thread
-    TaskHandle_t id = xTaskCreateStaticPinnedToCore(freertos_entry, name, *stack_size / sizeof(StackType_t), arg, priority, stack, tcb, 0);
+    TaskHandle_t id = xTaskCreateStaticPinnedToCore(freertos_entry, name, *stack_size / sizeof(StackType_t), arg, priority, stack, tcb, cpu_id);
     if (id == NULL) {
         mp_thread_mutex_unlock(&thread_mutex);
         nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "can't create thread"));
@@ -153,6 +153,15 @@ void mp_thread_create_ex(void *(*entry)(void*), void *arg, size_t *stack_size, i
     thread = th;
 
     mp_thread_mutex_unlock(&thread_mutex);
+}
+
+void mp_thread_create_ex(void *(*entry)(void*), void *arg, size_t *stack_size, int priority, char *name) {
+    mp_thread_create_ex2(entry, arg, stack_size, priority, name, 0);
+}
+
+void mp_thread_create2(void *(*entry)(void*), void *arg, size_t *stack_size, int cpu_id)
+{
+    mp_thread_create_ex2(entry, arg, stack_size, MP_THREAD_PRIORITY, "mp_thread", cpu_id);
 }
 
 void mp_thread_create(void *(*entry)(void*), void *arg, size_t *stack_size) {
