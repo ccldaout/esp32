@@ -94,6 +94,11 @@ void mp_thread_set_state(void *state) {
     vTaskSetThreadLocalStoragePointer(NULL, 1, state);
 }
 
+bool mp_thread_is_main(void)
+{
+    return ((void *)mp_thread_get_state == (void *)&mp_state_ctx.thread);
+}
+
 void mp_thread_start(void) {
     mp_thread_mutex_lock(&thread_mutex, 1);
     for (thread_t *th = thread; th != NULL; th = th->next) {

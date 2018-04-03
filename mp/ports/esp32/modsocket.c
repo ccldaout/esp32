@@ -54,18 +54,10 @@
 #include "lwip/igmp.h"
 #include "esp_log.h"
 
+#include "modsocket.h"
 #include "vterm.h"
 
 #define SOCKET_POLL_US (100000)
-
-typedef struct _socket_obj_t {
-    mp_obj_base_t base;
-    int fd;
-    uint8_t domain;
-    uint8_t type;
-    uint8_t proto;
-    unsigned int retries;
-} socket_obj_t;
 
 void _socket_settimeout(socket_obj_t *sock, uint64_t timeout_ms);
 

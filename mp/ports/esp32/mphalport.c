@@ -52,16 +52,20 @@ void mp_hal_stdout_dup(void (*tx_strn)(const char *str, uint32_t len))
 }
 
 int mp_hal_stdin_rx_chr(void) {
+    MP_THREAD_GIL_EXIT();
     for (;;) {
 	size_t n;
 	unsigned char *p = xRingbufferReceiveUpTo(stdin_ringbuf, &n, 0, 1);
 	if (p) {
 	    int c = *p;
 	    vRingbufferReturnItem(stdin_ringbuf, p);
+	    MP_THREAD_GIL_ENTER();
             return c;
         }
-        MICROPY_EVENT_POLL_HOOK
-        vTaskDelay(1);
+	MP_THREAD_GIL_ENTER();
+	mp_handle_pending();
+	MP_THREAD_GIL_EXIT();
+        vTaskDelay(20/portTICK_PERIOD_MS);
     }
 }
 

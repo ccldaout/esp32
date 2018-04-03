@@ -1,11 +1,6 @@
 /*
  * This file is part of the MicroPython project, http://micropython.org/
  *
- * The MIT License (MIT)
- *
- * Copyright (c) 2016 Damien P. George on behalf of Pycom Ltd
- * Copyright (c) 2017 Pycom Limited
- *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -25,24 +20,20 @@
  * THE SOFTWARE.
  */
 
-#ifndef MICROPY_INCLUDED_ESP32_MPTHREADPORT_H
-#define MICROPY_INCLUDED_ESP32_MPTHREADPORT_H
+#ifndef INCLUDED_MODSOCKET_H
+#define INCLUDED_MODSOCKET_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
+#include "py/obj.h"
+#include "lwip/sockets.h"
 
-typedef struct _mp_thread_mutex_t {
-    SemaphoreHandle_t handle;
-    StaticSemaphore_t buffer;
-} mp_thread_mutex_t;
+typedef struct _socket_obj_t {
+    mp_obj_base_t base;
+    int fd;
+    uint8_t domain;
+    uint8_t type;
+    uint8_t proto;
+    unsigned int retries;
+} socket_obj_t;
 
-void mp_thread_init(void *stack, uint32_t stack_len);
-bool mp_thread_is_main(void);
-void mp_thread_create_ex2(void *(*entry)(void*), void *arg, size_t *stack_size, int priority, char *name, int cpu_id);
-void mp_thread_create2(void *(*entry)(void*), void *arg, size_t *stack_size, int cpu_id);
-void mp_thread_gc_others(void);
-void mp_thread_deinit(void);
+#endif // INCLUDED_MODSOCKET_H
 
-#endif // MICROPY_INCLUDED_ESP32_MPTHREADPORT_H

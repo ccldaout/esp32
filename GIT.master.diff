@@ -148,7 +148,7 @@ index 0585de1c..af31e628 100644
  
  mp_obj_t mp_vfs_mount(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
 diff --git a/ports/esp32/Makefile b/ports/esp32/Makefile
-index d2d6192b..cd88a822 100644
+index d2d6192b..15464553 100644
 --- a/ports/esp32/Makefile
 +++ b/ports/esp32/Makefile
 @@ -14,8 +14,8 @@ FROZEN_MPY_DIR = modules
@@ -170,6 +170,14 @@ index d2d6192b..cd88a822 100644
  	fatfs_port.c \
  	help.c \
  	modutime.c \
+@@ -150,6 +151,7 @@ SRC_C = \
+ 	modesp.c \
+ 	modesp32.c \
+ 	moduhashlib.c \
++	modmpoll.c \
+ 	espneopixel.c \
+ 	machine_hw_spi.c \
+ 	machine_wdt.c \
 diff --git a/ports/esp32/machine_uart.c b/ports/esp32/machine_uart.c
 index 26cbc88f..41971a79 100644
 --- a/ports/esp32/machine_uart.c
@@ -204,20 +212,380 @@ index eebf183c..8893202b 100644
  
      // Allocate the uPy heap using malloc and get the largest available region
      size_t mp_task_heap_size = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+diff --git a/ports/esp32/modmpoll.c b/ports/esp32/modmpoll.c
+new file mode 100644
+index 00000000..beee296b
+--- /dev/null
++++ b/ports/esp32/modmpoll.c
+@@ -0,0 +1,343 @@
++/*
++ * This file is part of the MicroPython project, http://micropython.org/
++ *
++ * The MIT License (MIT)
++ *
++ * Copyright (c) 2014 Damien P. George
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#include "py/mpconfig.h"
++#if MICROPY_PY_MPOLL
++
++#include <stdio.h>
++#include <string.h>
++
++#include "py/runtime.h"
++#include "py/obj.h"
++#include "py/objlist.h"
++#include "py/stream.h"
++#include "py/mperrno.h"
++#include "py/mphal.h"
++
++#include "lwip/sockets.h"
++
++#include "modsocket.h"
++
++// Flags for poll()
++#define FLAG_ONESHOT (1)
++
++/// \class Poll - poll class
++
++//LWIP_SOCKET_OFFSET
++//CONFIG_LWIP_MAX_SOCKETS
++
++typedef struct _mp_obj_mpoll_t {
++    mp_obj_base_t base;
++    fd_set rset;
++    fd_set wset;
++    fd_set rset_result;
++    fd_set wset_result;
++    socket_obj_t *socks[CONFIG_LWIP_MAX_SOCKETS];
++    int maxfd;
++    //short iter_cnt;
++    short iter_idx;
++    int flags;
++    // callee-owned tuple
++    mp_obj_t ret_tuple;
++} mp_obj_mpoll_t;
++
++/// \method register(obj[, eventmask])
++STATIC mp_obj_t poll_register(uint n_args, const mp_obj_t *args) {
++    mp_obj_mpoll_t *self = args[0];
++    mp_uint_t flags;
++    if (n_args == 3) {
++        flags = mp_obj_get_int(args[2]);
++    } else {
++        flags = MP_STREAM_POLL_RD | MP_STREAM_POLL_WR;
++    }
++    socket_obj_t *socket = MP_OBJ_TO_PTR(args[1]);	// [TODO] CHECK TYPE
++    if ((flags & MP_STREAM_POLL_RD) != 0)
++	FD_SET(socket->fd, &self->rset);
++    if ((flags & MP_STREAM_POLL_WR) != 0)
++	FD_SET(socket->fd, &self->wset);
++    self->socks[socket->fd - LWIP_SOCKET_OFFSET] = socket;
++    if (socket->fd > self->maxfd)
++	self->maxfd = socket->fd;
++    return mp_const_none;
++}
++MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mpoll_register_obj, 2, 3, poll_register);
++
++/// \method unregister(obj)
++STATIC mp_obj_t poll_unregister(mp_obj_t self_in, mp_obj_t obj_in) {
++    mp_obj_mpoll_t *self = self_in;
++    socket_obj_t *socket = MP_OBJ_TO_PTR(obj_in);	// [TODO] CHECK TYPE
++    if (self->socks[socket->fd - LWIP_SOCKET_OFFSET] == NULL)
++	return mp_const_none;				// [TODO] raise KeyError
++    FD_CLR(socket->fd, &self->rset);
++    FD_CLR(socket->fd, &self->wset);
++    self->socks[socket->fd - LWIP_SOCKET_OFFSET] = NULL;
++    if (socket->fd == self->maxfd) {
++	int i;
++	for (i = self->maxfd - 1; i >= LWIP_SOCKET_OFFSET; i--) {
++	    if (self->socks[i - LWIP_SOCKET_OFFSET] != NULL)
++		break;
++	}
++	self->maxfd = i;
++    }
++    return mp_const_none;
++}
++MP_DEFINE_CONST_FUN_OBJ_2(mpoll_unregister_obj, poll_unregister);
++
++/// \method modify(obj, eventmask)
++STATIC mp_obj_t poll_modify(mp_obj_t self_in, mp_obj_t obj_in, mp_obj_t eventmask_in) {
++    mp_obj_mpoll_t *self = self_in;
++    socket_obj_t *socket = MP_OBJ_TO_PTR(obj_in);	// [TODO] CHECK TYPE
++    mp_uint_t flags = mp_obj_get_int(eventmask_in);
++    if (self->socks[socket->fd - LWIP_SOCKET_OFFSET] != NULL) {
++	FD_CLR(socket->fd, &self->rset);
++	FD_CLR(socket->fd, &self->wset);
++	if ((flags & MP_STREAM_POLL_RD) != 0)
++	    FD_SET(socket->fd, &self->rset);
++	if ((flags & MP_STREAM_POLL_WR) != 0)
++	    FD_SET(socket->fd, &self->wset);
++    } else
++	;						// [TODO] rais KeyError
++    return mp_const_none;
++}
++MP_DEFINE_CONST_FUN_OBJ_3(mpoll_modify_obj, poll_modify);
++
++STATIC void remove_invalids(mp_obj_mpoll_t *self)
++{
++    fd_set testset;
++    struct timeval testtmo = {.tv_sec=0, .tv_usec=0};
++    FD_ZERO(&testset);
++    for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
++	if (self->socks[i] == NULL)
++	    continue;
++	int fd = i + LWIP_SOCKET_OFFSET;
++	FD_SET(fd, &testset);
++	if (lwip_select(fd+1, &testset, NULL, NULL, &testtmo) == -1) {
++	    FD_CLR(fd, &self->rset);
++	    FD_CLR(fd, &self->wset);
++	    self->socks[i] = NULL;
++	}
++    }
++}
++
++STATIC int get_delay_ms(const struct timeval *target, int delay_ms)
++{
++    struct timeval now, trg = *target;
++    (void)gettimeofday(&now, NULL);
++    
++    trg.tv_sec -= now.tv_sec;
++    if (trg.tv_usec < now.tv_usec) {
++	trg.tv_sec--;
++	trg.tv_usec += 1000000;
++    }
++    trg.tv_usec -= now.tv_usec;
++    int diff_ms = now.tv_sec*1000 + now.tv_usec/1000;
++    if (diff_ms < 0)
++	return 0;
++    return (diff_ms > delay_ms) ? delay_ms : diff_ms;
++}
++
++STATIC mp_uint_t poll_poll_internal(uint n_args, const mp_obj_t *args) {
++    mp_obj_mpoll_t *self = args[0];
++    struct timeval timeout;
++    struct timeval target_time;
++    bool in_main = mp_thread_is_main();
++    const int interval_ms = 20;
++
++    // work out timeout (its given already in ms)
++    mp_uint_t timeout_ms = -1;
++    self->flags = 0;
++    if (n_args >= 2) {
++        if (args[1] != mp_const_none)
++	    timeout_ms = mp_obj_get_int(args[1]);
++        if (n_args >= 3)
++            self->flags = mp_obj_get_int(args[2]);
++    }
++
++    if (timeout_ms > 0) {
++	(void)gettimeofday(&target_time, NULL);
++	target_time.tv_sec += (timeout_ms / 1000);
++	target_time.tv_usec += (timeout_ms % 1000) * 1000;
++	if (target_time.tv_usec >= 1000000) {
++	    target_time.tv_usec -= 1000000;
++	    target_time.tv_sec += 1;
++	}
++    }
++
++    for (;;) {
++	int nready;
++	int delay_ms = timeout_ms == 0 ? 0 : get_delay_ms(&target_time, interval_ms);
++	if (self->maxfd == LWIP_SOCKET_OFFSET - 1) {
++	    vTaskDelay(delay_ms / portTICK_PERIOD_MS);
++	    nready = 0;
++	} else {
++	    timeout.tv_sec = 0;
++	    timeout.tv_usec = delay_ms * 1000;
++	    self->rset_result = self->rset;
++	    self->wset_result = self->wset;
++	    nready = lwip_select(self->maxfd+1, &self->rset_result, &self->wset_result, NULL, &timeout);
++	}
++	if (nready > 0)
++	    return nready;
++	if (nready == 0) {
++	    if (delay_ms < interval_ms)
++		return 0;
++	} else
++	    remove_invalids(self);
++	if (in_main) {
++	    MP_THREAD_GIL_ENTER();
++	    mp_handle_pending();
++	    MP_THREAD_GIL_EXIT();
++	}
++    }
++}
++
++STATIC mp_obj_t poll_poll(uint n_args, const mp_obj_t *args) {
++    mp_obj_mpoll_t *self = args[0];
++    MP_THREAD_GIL_EXIT();
++    mp_uint_t n_ready = poll_poll_internal(n_args, args);
++    MP_THREAD_GIL_ENTER();
++
++    // one or more objects are ready, or we had a timeout
++    mp_obj_list_t *ret_list = mp_obj_new_list(n_ready, NULL);
++    n_ready = 0;
++    for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
++	if (self->socks[i] == NULL)
++	    continue;
++	int fd = i + LWIP_SOCKET_OFFSET;
++	int flags = 0;
++	if (FD_ISSET(fd, &self->rset_result))
++	    flags |= MP_STREAM_POLL_RD;
++	if (FD_ISSET(fd, &self->wset_result))
++	    flags |= MP_STREAM_POLL_WR;
++	if (flags == 0)
++	    continue;
++	mp_obj_t tuple[2] = {MP_OBJ_FROM_PTR(self->socks[i]), MP_OBJ_NEW_SMALL_INT(flags)};
++	ret_list->items[n_ready++] = mp_obj_new_tuple(2, tuple);
++	if (self->flags & FLAG_ONESHOT) {
++	    // Don't poll next time, until new event flags will be set explicitly
++	    FD_CLR(fd, &self->rset);
++	    FD_CLR(fd, &self->wset);
++        }
++    }
++    return ret_list;
++}
++MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mpoll_poll_obj, 1, 3, poll_poll);
++
++STATIC mp_obj_t poll_ipoll(size_t n_args, const mp_obj_t *args) {
++    mp_obj_mpoll_t *self = MP_OBJ_TO_PTR(args[0]);
++
++    if (self->ret_tuple == MP_OBJ_NULL) {
++        self->ret_tuple = mp_obj_new_tuple(2, NULL);
++    }
++
++    MP_THREAD_GIL_EXIT();
++    if (poll_poll_internal(n_args, args) == 0)
++	self->iter_idx = CONFIG_LWIP_MAX_SOCKETS;
++    else
++	self->iter_idx = 0;
++    MP_THREAD_GIL_ENTER();
++
++    return args[0];
++}
++MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mpoll_ipoll_obj, 1, 3, poll_ipoll);
++
++STATIC mp_obj_t poll_iternext(mp_obj_t self_in) {
++    mp_obj_mpoll_t *self = MP_OBJ_TO_PTR(self_in);
++
++    while (self->iter_idx < CONFIG_LWIP_MAX_SOCKETS) {
++	int i = self->iter_idx++;
++	if (self->socks[i] == NULL)
++	    continue;
++	int fd = i + LWIP_SOCKET_OFFSET;
++	int flags = 0;
++	if (FD_ISSET(fd, &self->rset_result))
++	    flags |= MP_STREAM_POLL_RD;
++	if (FD_ISSET(fd, &self->wset_result))
++	    flags |= MP_STREAM_POLL_WR;
++	if (flags == 0)
++	    continue;
++	mp_obj_tuple_t *t = MP_OBJ_TO_PTR(self->ret_tuple);
++	t->items[0] = MP_OBJ_FROM_PTR(self->socks[i]);
++	t->items[1] = MP_OBJ_NEW_SMALL_INT(flags);
++	if (self->flags & FLAG_ONESHOT) {
++	    // Don't poll next time, until new event flags will be set explicitly
++	    FD_CLR(fd, &self->rset);
++	    FD_CLR(fd, &self->wset);
++        }
++	return MP_OBJ_FROM_PTR(t);
++    }
++
++    return MP_OBJ_STOP_ITERATION;
++}
++
++STATIC const mp_rom_map_elem_t poll_locals_dict_table[] = {
++    { MP_ROM_QSTR(MP_QSTR_register), MP_ROM_PTR(&mpoll_register_obj) },
++    { MP_ROM_QSTR(MP_QSTR_unregister), MP_ROM_PTR(&mpoll_unregister_obj) },
++    { MP_ROM_QSTR(MP_QSTR_modify), MP_ROM_PTR(&mpoll_modify_obj) },
++    { MP_ROM_QSTR(MP_QSTR_poll), MP_ROM_PTR(&mpoll_poll_obj) },
++    { MP_ROM_QSTR(MP_QSTR_ipoll), MP_ROM_PTR(&mpoll_ipoll_obj) },
++};
++STATIC MP_DEFINE_CONST_DICT(poll_locals_dict, poll_locals_dict_table);
++
++STATIC const mp_obj_type_t mp_type_poll = {
++    { &mp_type_type },
++    .name = MP_QSTR_poll,
++    .getiter = mp_identity_getiter,
++    .iternext = poll_iternext,
++    .locals_dict = (void*)&poll_locals_dict,
++};
++
++/// \function poll()
++STATIC mp_obj_t mpoll_poll(void) {
++    mp_obj_mpoll_t *poll = m_new_obj(mp_obj_mpoll_t);
++    poll->base.type = &mp_type_poll;
++    poll->ret_tuple = MP_OBJ_NULL;
++    FD_ZERO(&poll->rset);
++    FD_ZERO(&poll->wset);
++    poll->maxfd = LWIP_SOCKET_OFFSET - 1;
++    for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++)
++	poll->socks[i] = NULL;
++    return poll;
++}
++MP_DEFINE_CONST_FUN_OBJ_0(mp_mpoll_poll_obj, mpoll_poll);
++
++STATIC const mp_rom_map_elem_t mp_module_mpoll_globals_table[] = {
++    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_mpoll) },
++    { MP_ROM_QSTR(MP_QSTR_poll), MP_ROM_PTR(&mp_mpoll_poll_obj) },
++    { MP_ROM_QSTR(MP_QSTR_POLLIN), MP_ROM_INT(MP_STREAM_POLL_RD) },
++    { MP_ROM_QSTR(MP_QSTR_POLLOUT), MP_ROM_INT(MP_STREAM_POLL_WR) },
++    { MP_ROM_QSTR(MP_QSTR_POLLERR), MP_ROM_INT(MP_STREAM_POLL_ERR) },
++    { MP_ROM_QSTR(MP_QSTR_POLLHUP), MP_ROM_INT(MP_STREAM_POLL_HUP) },
++};
++
++STATIC MP_DEFINE_CONST_DICT(mp_module_mpoll_globals, mp_module_mpoll_globals_table);
++
++const mp_obj_module_t mp_module_mpoll = {
++    .base = { &mp_type_module },
++    .globals = (mp_obj_dict_t*)&mp_module_mpoll_globals,
++};
++
++#endif // MICROPY_PY_MPOLL
 diff --git a/ports/esp32/modsocket.c b/ports/esp32/modsocket.c
-index 31d15396..5abc44d0 100644
+index 31d15396..2723d270 100644
 --- a/ports/esp32/modsocket.c
 +++ b/ports/esp32/modsocket.c
-@@ -54,6 +54,8 @@
+@@ -54,16 +54,10 @@
  #include "lwip/igmp.h"
  #include "esp_log.h"
  
+-#define SOCKET_POLL_US (100000)
++#include "modsocket.h"
 +#include "vterm.h"
-+
- #define SOCKET_POLL_US (100000)
  
- typedef struct _socket_obj_t {
-@@ -222,6 +224,16 @@ STATIC mp_obj_t socket_setsockopt(size_t n_args, const mp_obj_t *args) {
+-typedef struct _socket_obj_t {
+-    mp_obj_base_t base;
+-    int fd;
+-    uint8_t domain;
+-    uint8_t type;
+-    uint8_t proto;
+-    unsigned int retries;
+-} socket_obj_t;
++#define SOCKET_POLL_US (100000)
+ 
+ void _socket_settimeout(socket_obj_t *sock, uint64_t timeout_ms);
+ 
+@@ -222,6 +216,16 @@ STATIC mp_obj_t socket_setsockopt(size_t n_args, const mp_obj_t *args) {
              break;
          }
  
@@ -234,7 +602,7 @@ index 31d15396..5abc44d0 100644
          // level: IPPROTO_IP
          case IP_ADD_MEMBERSHIP: {
              mp_buffer_info_t bufinfo;
-@@ -392,6 +404,13 @@ STATIC mp_obj_t socket_makefile(size_t n_args, const mp_obj_t *args) {
+@@ -392,6 +396,13 @@ STATIC mp_obj_t socket_makefile(size_t n_args, const mp_obj_t *args) {
  }
  STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(socket_makefile_obj, 1, 3, socket_makefile);
  
@@ -248,7 +616,7 @@ index 31d15396..5abc44d0 100644
  
  // XXX this can end up waiting a very long time if the content is dribbled in one character
  // at a time, as the timeout resets each time a recvfrom succeeds ... this is probably not
-@@ -472,6 +491,7 @@ STATIC const mp_map_elem_t socket_locals_dict_table[] = {
+@@ -472,6 +483,7 @@ STATIC const mp_map_elem_t socket_locals_dict_table[] = {
      { MP_OBJ_NEW_QSTR(MP_QSTR_settimeout), (mp_obj_t)&socket_settimeout_obj },
      { MP_OBJ_NEW_QSTR(MP_QSTR_setblocking), (mp_obj_t)&socket_setblocking_obj },
      { MP_OBJ_NEW_QSTR(MP_QSTR_makefile), (mp_obj_t)&socket_makefile_obj },
@@ -256,7 +624,7 @@ index 31d15396..5abc44d0 100644
      { MP_OBJ_NEW_QSTR(MP_QSTR_fileno), (mp_obj_t)&socket_fileno_obj },
  
      { MP_OBJ_NEW_QSTR(MP_QSTR_read), (mp_obj_t)&mp_stream_read_obj },
-@@ -584,6 +604,7 @@ STATIC const mp_map_elem_t mp_module_socket_globals_table[] = {
+@@ -584,6 +596,7 @@ STATIC const mp_map_elem_t mp_module_socket_globals_table[] = {
      { MP_OBJ_NEW_QSTR(MP_QSTR_SOL_SOCKET), MP_OBJ_NEW_SMALL_INT(SOL_SOCKET) },
      { MP_OBJ_NEW_QSTR(MP_QSTR_SO_REUSEADDR), MP_OBJ_NEW_SMALL_INT(SO_REUSEADDR) },
      { MP_OBJ_NEW_QSTR(MP_QSTR_IP_ADD_MEMBERSHIP), MP_OBJ_NEW_SMALL_INT(IP_ADD_MEMBERSHIP) },
@@ -264,6 +632,51 @@ index 31d15396..5abc44d0 100644
  };
  
  STATIC MP_DEFINE_CONST_DICT(mp_module_socket_globals, mp_module_socket_globals_table);
+diff --git a/ports/esp32/modsocket.h b/ports/esp32/modsocket.h
+new file mode 100644
+index 00000000..13f57bce
+--- /dev/null
++++ b/ports/esp32/modsocket.h
+@@ -0,0 +1,39 @@
++/*
++ * This file is part of the MicroPython project, http://micropython.org/
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#ifndef INCLUDED_MODSOCKET_H
++#define INCLUDED_MODSOCKET_H
++
++#include "py/obj.h"
++#include "lwip/sockets.h"
++
++typedef struct _socket_obj_t {
++    mp_obj_base_t base;
++    int fd;
++    uint8_t domain;
++    uint8_t type;
++    uint8_t proto;
++    unsigned int retries;
++} socket_obj_t;
++
++#endif // INCLUDED_MODSOCKET_H
++
 diff --git a/ports/esp32/modules/webrepl.py b/ports/esp32/modules/webrepl.py
 new file mode 100644
 index 00000000..ee11312b
@@ -444,21 +857,30 @@ index 9f0e291a..54f357a6 100644
      { MP_ROM_QSTR(MP_QSTR_ilistdir), MP_ROM_PTR(&mp_vfs_ilistdir_obj) },
      { MP_ROM_QSTR(MP_QSTR_listdir), MP_ROM_PTR(&mp_vfs_listdir_obj) },
 diff --git a/ports/esp32/mpconfigport.h b/ports/esp32/mpconfigport.h
-index 80594b11..9f440021 100644
+index 80594b11..dc18be14 100644
 --- a/ports/esp32/mpconfigport.h
 +++ b/ports/esp32/mpconfigport.h
-@@ -141,7 +141,9 @@
+@@ -141,7 +141,10 @@
  #define MICROPY_SSL_MBEDTLS                 (1)
  #define MICROPY_PY_USSL_FINALISER           (1)
  #define MICROPY_PY_WEBSOCKET                (1)
 +#define MICROPY_PY_WEBREPL		    (1)
  #define MICROPY_PY_FRAMEBUF                 (1)
 +#define MICROPY_PY_GENSTREAM		    (1)
++#define MICROPY_PY_MPOLL		    (1)
  
  // fatfs configuration
  #define MICROPY_FATFS_ENABLE_LFN            (1)
+@@ -221,6 +224,7 @@ extern const struct _mp_obj_module_t mp_module_onewire;
+ #define MICROPY_END_ATOMIC_SECTION(state) portEXIT_CRITICAL_NESTED(state)
+ 
+ #if MICROPY_PY_THREAD
++extern void mp_handle_pending(void);
+ #define MICROPY_EVENT_POLL_HOOK \
+     do { \
+         extern void mp_handle_pending(void); \
 diff --git a/ports/esp32/mphalport.c b/ports/esp32/mphalport.c
-index e588fc65..df3432fc 100644
+index e588fc65..ddec5df9 100644
 --- a/ports/esp32/mphalport.c
 +++ b/ports/esp32/mphalport.c
 @@ -27,6 +27,7 @@
@@ -469,7 +891,7 @@ index e588fc65..df3432fc 100644
  #include <sys/time.h>
  
  #include "freertos/FreeRTOS.h"
-@@ -39,13 +40,24 @@
+@@ -39,49 +40,76 @@
  #include "extmod/misc.h"
  #include "lib/utils/pyexec.h"
  
@@ -487,6 +909,7 @@ index e588fc65..df3432fc 100644
 +}
  
  int mp_hal_stdin_rx_chr(void) {
++    MP_THREAD_GIL_EXIT();
      for (;;) {
 -        int c = ringbuf_get(&stdin_ringbuf);
 -        if (c != -1) {
@@ -495,10 +918,15 @@ index e588fc65..df3432fc 100644
 +	if (p) {
 +	    int c = *p;
 +	    vRingbufferReturnItem(stdin_ringbuf, p);
++	    MP_THREAD_GIL_ENTER();
              return c;
          }
-         MICROPY_EVENT_POLL_HOOK
-@@ -53,35 +65,47 @@ int mp_hal_stdin_rx_chr(void) {
+-        MICROPY_EVENT_POLL_HOOK
+-        vTaskDelay(1);
++	MP_THREAD_GIL_ENTER();
++	mp_handle_pending();
++	MP_THREAD_GIL_EXIT();
++        vTaskDelay(20/portTICK_PERIOD_MS);
      }
  }
  
@@ -572,7 +1000,7 @@ index 3215bc06..5650925f 100644
  uint32_t mp_hal_ticks_us(void);
  __attribute__((always_inline)) static inline uint32_t mp_hal_ticks_cpu(void) {
 diff --git a/ports/esp32/mpthreadport.c b/ports/esp32/mpthreadport.c
-index 76d9431c..54b324ff 100644
+index 76d9431c..b60049ff 100644
 --- a/ports/esp32/mpthreadport.c
 +++ b/ports/esp32/mpthreadport.c
 @@ -37,8 +37,8 @@
@@ -586,6 +1014,30 @@ index 76d9431c..54b324ff 100644
  #define MP_THREAD_PRIORITY                              (ESP_TASK_PRIO_MIN + 1)
  
  // this structure forms a linked list, one node per active thread
+@@ -94,6 +94,11 @@ void mp_thread_set_state(void *state) {
+     vTaskSetThreadLocalStoragePointer(NULL, 1, state);
+ }
+ 
++bool mp_thread_is_main(void)
++{
++    return ((void *)mp_thread_get_state == (void *)&mp_state_ctx.thread);
++}
++
+ void mp_thread_start(void) {
+     mp_thread_mutex_lock(&thread_mutex, 1);
+     for (thread_t *th = thread; th != NULL; th = th->next) {
+diff --git a/ports/esp32/mpthreadport.h b/ports/esp32/mpthreadport.h
+index 54e35d61..eebba304 100644
+--- a/ports/esp32/mpthreadport.h
++++ b/ports/esp32/mpthreadport.h
+@@ -39,6 +39,7 @@ typedef struct _mp_thread_mutex_t {
+ } mp_thread_mutex_t;
+ 
+ void mp_thread_init(void *stack, uint32_t stack_len);
++bool mp_thread_is_main(void);
+ void mp_thread_gc_others(void);
+ void mp_thread_deinit(void);
+ 
 diff --git a/ports/esp32/sdkconfig.h b/ports/esp32/sdkconfig.h
 index 113c0395..2bf86363 100644
 --- a/ports/esp32/sdkconfig.h
@@ -1066,14 +1518,15 @@ index 00000000..c6416636
 +
 +#endif // INCLUDED_VTERM_H
 diff --git a/py/builtin.h b/py/builtin.h
-index 84b99a8a..9c566b4f 100644
+index 84b99a8a..f2ada30d 100644
 --- a/py/builtin.h
 +++ b/py/builtin.h
-@@ -115,6 +115,7 @@ extern const mp_obj_module_t mp_module_machine;
+@@ -115,6 +115,8 @@ extern const mp_obj_module_t mp_module_machine;
  extern const mp_obj_module_t mp_module_lwip;
  extern const mp_obj_module_t mp_module_websocket;
  extern const mp_obj_module_t mp_module_webrepl;
 +extern const mp_obj_module_t mp_module_genstream;
++extern const mp_obj_module_t mp_module_mpoll;
  extern const mp_obj_module_t mp_module_framebuf;
  extern const mp_obj_module_t mp_module_btree;
  
@@ -1093,15 +1546,18 @@ index 532b54ab..cf23f5b4 100644
  #define MICROPY_PY_BTREE (0)
  #endif
 diff --git a/py/objmodule.c b/py/objmodule.c
-index c4aba3a7..883ffd59 100644
+index c4aba3a7..f568cf66 100644
 --- a/py/objmodule.c
 +++ b/py/objmodule.c
-@@ -214,6 +214,9 @@ STATIC const mp_rom_map_elem_t mp_builtin_module_table[] = {
+@@ -214,6 +214,12 @@ STATIC const mp_rom_map_elem_t mp_builtin_module_table[] = {
  #if MICROPY_PY_WEBREPL
      { MP_ROM_QSTR(MP_QSTR__webrepl), MP_ROM_PTR(&mp_module_webrepl) },
  #endif
 +#if MICROPY_PY_GENSTREAM
 +    { MP_ROM_QSTR(MP_QSTR_genstream), MP_ROM_PTR(&mp_module_genstream) },
++#endif
++#if MICROPY_PY_MPOLL
++    { MP_ROM_QSTR(MP_QSTR_mpoll), MP_ROM_PTR(&mp_module_mpoll) },
 +#endif
  #if MICROPY_PY_FRAMEBUF
      { MP_ROM_QSTR(MP_QSTR_framebuf), MP_ROM_PTR(&mp_module_framebuf) },

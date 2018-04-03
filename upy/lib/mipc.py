@@ -22,7 +22,10 @@ def _thread_getlock():
     return _thread.allocate_lock()
 
 #### poll
-import select as mpoll
+try:
+    import mpoll
+except:
+    import select as mpoll
 
 #### socket.read
 def _recvall(sock, n):
