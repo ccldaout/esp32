@@ -1,0 +1,320 @@
+diff --git a/components/esp32/cpu_start.c b/components/esp32/cpu_start.c
+index b66201c4..9371e489 100644
+--- a/components/esp32/cpu_start.c
++++ b/components/esp32/cpu_start.c
+@@ -334,7 +334,7 @@ void start_cpu0_default(void)
+     esp_cache_err_int_init();
+     esp_crosscore_int_init();
+     esp_ipc_init();
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     esp_dport_access_int_init();
+ #endif
+     spi_flash_init();
+diff --git a/components/esp32/dport_access.c b/components/esp32/dport_access.c
+index 2281eea3..193844b0 100644
+--- a/components/esp32/dport_access.c
++++ b/components/esp32/dport_access.c
+@@ -41,7 +41,7 @@
+ 
+ #include "xtensa/core-macros.h"
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ static portMUX_TYPE g_dport_mux = portMUX_INITIALIZER_UNLOCKED;
+ 
+ #define DPORT_CORE_STATE_IDLE        0
+@@ -69,7 +69,7 @@ static BaseType_t oldInterruptLevel[2];
+ /* stall other cpu that this cpu is pending to access dport register start */
+ void IRAM_ATTR esp_dport_access_stall_other_cpu_start(void)
+ {
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     if (dport_core_state[0] == DPORT_CORE_STATE_IDLE
+         || dport_core_state[1] == DPORT_CORE_STATE_IDLE) {
+         return;
+@@ -114,7 +114,7 @@ void IRAM_ATTR esp_dport_access_stall_other_cpu_start(void)
+ /* stall other cpu that this cpu is pending to access dport register end */
+ void IRAM_ATTR esp_dport_access_stall_other_cpu_end(void)
+ {
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     int cpu_id = xPortGetCoreID();
+     
+     if (dport_core_state[0] == DPORT_CORE_STATE_IDLE
+@@ -154,7 +154,7 @@ void IRAM_ATTR esp_dport_access_stall_other_cpu_end_wrap(void)
+     DPORT_STALL_OTHER_CPU_END();
+ }
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ static void dport_access_init_core(void *arg)
+ {
+     int core_id = 0;
+@@ -182,7 +182,7 @@ static void dport_access_init_core(void *arg)
+ /*  Defer initialisation until after scheduler is running */
+ void esp_dport_access_int_init(void)
+ {
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     portBASE_TYPE res = xTaskCreatePinnedToCore(&dport_access_init_core, "dport", configMINIMAL_STACK_SIZE, NULL, 5, NULL, xPortGetCoreID());
+     assert(res == pdTRUE);
+ #endif
+@@ -190,7 +190,7 @@ void esp_dport_access_int_init(void)
+ 
+ void IRAM_ATTR esp_dport_access_int_pause(void)
+ {
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     portENTER_CRITICAL_ISR(&g_dport_mux);
+     dport_core_state[0] = DPORT_CORE_STATE_IDLE;
+     dport_core_state[1] = DPORT_CORE_STATE_IDLE;
+@@ -201,7 +201,7 @@ void IRAM_ATTR esp_dport_access_int_pause(void)
+ //Used in panic code: the enter_critical stuff may be messed up so we just stop everything without checking the mux.
+ void IRAM_ATTR esp_dport_access_int_abort(void)
+ {
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     dport_core_state[0] = DPORT_CORE_STATE_IDLE;
+     dport_core_state[1] = DPORT_CORE_STATE_IDLE;
+ #endif
+@@ -209,7 +209,7 @@ void IRAM_ATTR esp_dport_access_int_abort(void)
+ 
+ void IRAM_ATTR esp_dport_access_int_resume(void)
+ {
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     portENTER_CRITICAL_ISR(&g_dport_mux);
+     dport_core_state[0] = DPORT_CORE_STATE_RUNNING;
+     dport_core_state[1] = DPORT_CORE_STATE_RUNNING;
+diff --git a/components/esp32/spiram.c b/components/esp32/spiram.c
+index d07444a9..036022be 100644
+--- a/components/esp32/spiram.c
++++ b/components/esp32/spiram.c
+@@ -168,7 +168,7 @@ void IRAM_ATTR esp_spiram_writeback_cache()
+         cache_was_disabled|=(1<<0);
+         DPORT_SET_PERI_REG_BITS(DPORT_PRO_CACHE_CTRL_REG, 1, 1, DPORT_PRO_CACHE_ENABLE_S);
+     }
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     if (DPORT_REG_GET_BIT(DPORT_APP_CACHE_CTRL_REG, DPORT_APP_CACHE_ENABLE)==0) {
+         cache_was_disabled|=(1<<1);
+         DPORT_SET_PERI_REG_BITS(DPORT_APP_CACHE_CTRL_REG, 1, 1, DPORT_APP_CACHE_ENABLE_S);
+@@ -194,7 +194,7 @@ void IRAM_ATTR esp_spiram_writeback_cache()
+         while (DPORT_GET_PERI_REG_BITS2(DPORT_PRO_DCACHE_DBUG0_REG, DPORT_PRO_CACHE_STATE, DPORT_PRO_CACHE_STATE_S) != 1) ;
+         DPORT_SET_PERI_REG_BITS(DPORT_PRO_CACHE_CTRL_REG, 1, 0, DPORT_PRO_CACHE_ENABLE_S);
+     }
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     if (cache_was_disabled&(1<<1)) {
+         while (DPORT_GET_PERI_REG_BITS2(DPORT_APP_DCACHE_DBUG0_REG, DPORT_APP_CACHE_STATE, DPORT_APP_CACHE_STATE_S) != 1);
+         DPORT_SET_PERI_REG_BITS(DPORT_APP_CACHE_CTRL_REG, 1, 0, DPORT_APP_CACHE_ENABLE_S);
+diff --git a/components/esp32/test/test_dport.c b/components/esp32/test/test_dport.c
+index 930d8cdc..15770169 100644
+--- a/components/esp32/test/test_dport.c
++++ b/components/esp32/test/test_dport.c
+@@ -67,7 +67,7 @@ TEST_CASE("access DPORT and APB at same time", "[esp32]")
+ 
+     exit_flag = false;
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     printf("assign task accessing DPORT to core 0 and task accessing APB to core 1\n");
+     xTaskCreatePinnedToCore(accessDPORT  , "accessDPORT"  , 2048, &exit_sema[0], UNITY_FREERTOS_PRIORITY - 1, &th[0], 0);
+     xTaskCreatePinnedToCore(accessAPB  , "accessAPB"  , 2048, &exit_sema[1], UNITY_FREERTOS_PRIORITY - 1, &th[1], 1);
+diff --git a/components/esp32/test/test_restart.c b/components/esp32/test/test_restart.c
+index 6ad334da..dc88a7a1 100644
+--- a/components/esp32/test/test_restart.c
++++ b/components/esp32/test/test_restart.c
+@@ -14,7 +14,7 @@ static void restart_task(void *arg)
+     esp_restart();
+ }
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ TEST_CASE("restart from APP CPU", "[restart][reset=SW_CPU_RESET]")
+ {
+     xTaskCreatePinnedToCore(&restart_task, "restart", 2048, NULL, 5, NULL, 1);
+diff --git a/components/esp32/test/test_sleep.c b/components/esp32/test/test_sleep.c
+index 8db4a0f4..bf8dbe83 100644
+--- a/components/esp32/test/test_sleep.c
++++ b/components/esp32/test/test_sleep.c
+@@ -46,7 +46,7 @@ TEST_CASE("wake up from light sleep using timer", "[deepsleep]")
+     TEST_ASSERT_INT32_WITHIN(500, 2000, (int) dt);
+ }
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ TEST_CASE("enter deep sleep on APP CPU and wake up using timer", "[deepsleep][reset=DEEPSLEEP_RESET]")
+ {
+     esp_sleep_enable_timer_wakeup(2000000);
+diff --git a/components/freertos/include/freertos/FreeRTOSConfig.h b/components/freertos/include/freertos/FreeRTOSConfig.h
+index 37912a66..2f0a4a08 100644
+--- a/components/freertos/include/freertos/FreeRTOSConfig.h
++++ b/components/freertos/include/freertos/FreeRTOSConfig.h
+@@ -74,7 +74,7 @@
+ 
+ 
+ /* ESP31 and ESP32 are dualcore processors. */
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ #define portNUM_PROCESSORS 2
+ #else 
+ #define portNUM_PROCESSORS 1
+diff --git a/components/freertos/test/test_freertos_task_notify.c b/components/freertos/test/test_freertos_task_notify.c
+index f4647442..b2f9a5ad 100644
+--- a/components/freertos/test/test_freertos_task_notify.c
++++ b/components/freertos/test/test_freertos_task_notify.c
+@@ -163,7 +163,7 @@ TEST_CASE("Test Task_Notify", "[freertos]")
+     //Initialize and pause timers. Used to trigger ISR
+     intr_handle_t isr_handle_0 = NULL;
+     timerg0_init(&isr_handle_0);       //Core 0 timer
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     intr_handle_t isr_handle_1 = NULL;
+     esp_ipc_call(1, timerg0_init, &isr_handle_1);      //Core 1 timer
+ #endif
+@@ -201,7 +201,7 @@ TEST_CASE("Test Task_Notify", "[freertos]")
+     vSemaphoreDelete(task_delete_semphr);
+     timerg0_deinit(&isr_handle_0);
+     isr_handle_0 = NULL;
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     esp_ipc_call(1, timerg0_deinit, &isr_handle_1);
+     isr_handle_1 = NULL;
+ #endif
+diff --git a/components/freertos/test/test_freertos_trace_utilities.c b/components/freertos/test/test_freertos_trace_utilities.c
+index da01b8a0..176e19e8 100644
+--- a/components/freertos/test/test_freertos_trace_utilities.c
++++ b/components/freertos/test/test_freertos_trace_utilities.c
+@@ -43,7 +43,7 @@ void task_test_trace_utilities(void *arg)
+     TEST_ASSERT(ucQueueGetQueueType(test_queues[core]) == BIN_SEM_QUEUE_TYPE)
+ 
+     //Test on other core
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     TEST_ASSERT(uxTaskGetTaskNumber(task_handles[!core]) == (0x0F << (!core)));
+     TEST_ASSERT(uxQueueGetQueueNumber(test_queues[!core]) == (0x0F << (!core)));
+     TEST_ASSERT(ucQueueGetQueueType(test_queues[!core]) == BIN_SEM_QUEUE_TYPE)
+diff --git a/components/freertos/test/test_spinlocks.c b/components/freertos/test/test_spinlocks.c
+index 7f83e751..827bc07c 100644
+--- a/components/freertos/test/test_spinlocks.c
++++ b/components/freertos/test/test_spinlocks.c
+@@ -45,7 +45,7 @@ TEST_CASE("portMUX spinlocks (no contention)", "[freertos]")
+     }
+     BENCHMARK_END("no contention lock");
+ 
+-#ifdef CONFIG_FREERTOS_UNICORE
++#if CONFIG_FREERTOS_UNICORE // %%%%
+     TEST_PERFORMANCE_LESS_THAN(FREERTOS_SPINLOCK_CYCLES_PER_OP_UNICORE, "%d cycles/op", ((end - start)/REPEAT_OPS));
+ #else
+ #if CONFIG_SPIRAM_SUPPORT
+diff --git a/components/freertos/test/test_suspend_scheduler.c b/components/freertos/test/test_suspend_scheduler.c
+index 3d8932d8..0269b49f 100644
+--- a/components/freertos/test/test_suspend_scheduler.c
++++ b/components/freertos/test/test_suspend_scheduler.c
+@@ -206,7 +206,7 @@ static void suspend_scheduler_5ms_task_fn(void *ignore)
+     vTaskDelete(NULL);
+ }
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ /* If the scheduler is disabled on one CPU (A) with a task blocked on something, and a task
+    on B (where scheduler is running) wakes it, then the task on A should be woken on resume.
+ */
+diff --git a/components/freertos/test/test_task_suspend_resume.c b/components/freertos/test/test_task_suspend_resume.c
+index d66e4af5..46351210 100644
+--- a/components/freertos/test/test_task_suspend_resume.c
++++ b/components/freertos/test/test_task_suspend_resume.c
+@@ -67,7 +67,7 @@ TEST_CASE("Suspend/resume task on same core", "[freertos]")
+     test_suspend_resume(UNITY_FREERTOS_CPU);
+ }
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ TEST_CASE("Suspend/resume task on other core", "[freertos]")
+ {
+     test_suspend_resume(!UNITY_FREERTOS_CPU);
+@@ -165,7 +165,7 @@ TEST_CASE("Resume task from ISR (same core)", "[freertos]")
+     test_resume_task_from_isr(UNITY_FREERTOS_CPU);
+ }
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ TEST_CASE("Resume task from ISR (other core)", "[freertos]")
+ {
+     test_resume_task_from_isr(!UNITY_FREERTOS_CPU);
+diff --git a/components/heap/heap_trace.c b/components/heap/heap_trace.c
+index b7ef4851..449e5084 100644
+--- a/components/heap/heap_trace.c
++++ b/components/heap/heap_trace.c
+@@ -265,7 +265,7 @@ static IRAM_ATTR void remove_record(int index)
+ inline static uint32_t get_ccount(void)
+ {
+     uint32_t ccount = xthal_get_ccount() & ~3;
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     ccount |= xPortGetCoreID();
+ #endif
+     return ccount;
+diff --git a/components/mbedtls/test/test_apb_dport_access.c b/components/mbedtls/test/test_apb_dport_access.c
+index 54e518bc..e2de2ae8 100644
+--- a/components/mbedtls/test/test_apb_dport_access.c
++++ b/components/mbedtls/test/test_apb_dport_access.c
+@@ -9,7 +9,7 @@
+ #include "soc/uart_reg.h"
+ #include "test_apb_dport_access.h"
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ 
+ static void apb_access_loop_task(void *ignore);
+ 
+diff --git a/components/spi_flash/cache_utils.c b/components/spi_flash/cache_utils.c
+index bc4e8885..e8eb01c5 100644
+--- a/components/spi_flash/cache_utils.c
++++ b/components/spi_flash/cache_utils.c
+@@ -37,7 +37,7 @@ static void IRAM_ATTR spi_flash_restore_cache(uint32_t cpuid, uint32_t saved_sta
+ 
+ static uint32_t s_flash_op_cache_state[2];
+ 
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+ static SemaphoreHandle_t s_flash_op_mutex;
+ static volatile bool s_flash_op_can_start = false;
+ static volatile bool s_flash_op_complete = false;
+diff --git a/components/spi_flash/flash_mmap.c b/components/spi_flash/flash_mmap.c
+index d6b884d3..ae252e2f 100644
+--- a/components/spi_flash/flash_mmap.c
++++ b/components/spi_flash/flash_mmap.c
+@@ -347,7 +347,7 @@ static inline IRAM_ATTR bool update_written_pages(size_t start_addr, size_t leng
+             esp_spiram_writeback_cache();
+ #endif
+             Cache_Flush(0);
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+             Cache_Flush(1);
+ #endif
+             bzero(written_pages, sizeof(written_pages));
+diff --git a/components/spi_flash/test/test_spi_flash.c b/components/spi_flash/test/test_spi_flash.c
+index e47cdf84..5a9f6ede 100644
+--- a/components/spi_flash/test/test_spi_flash.c
++++ b/components/spi_flash/test/test_spi_flash.c
+@@ -69,7 +69,7 @@ TEST_CASE("flash write and erase work both on PRO CPU and on APP CPU", "[spi_fla
+             { .offset = 0x100 + 6, .done = done },
+             { .offset = 0x100 + 7, .done = done },
+             { .offset = 0x100 + 8, .done = done },
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+             { .offset = 0x100 + 9, .done = done }
+ #endif
+     };
+@@ -77,7 +77,7 @@ TEST_CASE("flash write and erase work both on PRO CPU and on APP CPU", "[spi_fla
+     xTaskCreatePinnedToCore(flash_test_task, "t0", 2048, &ctx[0], 3, NULL, 0);
+     xTaskCreatePinnedToCore(flash_test_task, "t1", 2048, &ctx[1], 3, NULL, tskNO_AFFINITY);
+     xTaskCreatePinnedToCore(flash_test_task, "t2", 2048, &ctx[2], 3, NULL, tskNO_AFFINITY);
+-#ifndef CONFIG_FREERTOS_UNICORE
++#if !CONFIG_FREERTOS_UNICORE // %%%%
+     xTaskCreatePinnedToCore(flash_test_task, "t3", 2048, &ctx[3], 3, NULL, 1);
+ #endif
+ 
