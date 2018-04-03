@@ -151,6 +151,7 @@ SRC_C = \
 	modesp.c \
 	modesp32.c \
 	moduhashlib.c \
+	modmpoll.c \
 	espneopixel.c \
 	machine_hw_spi.c \
 	machine_wdt.c \

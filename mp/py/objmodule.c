@@ -217,6 +217,9 @@ STATIC const mp_rom_map_elem_t mp_builtin_module_table[] = {
 #if MICROPY_PY_GENSTREAM
     { MP_ROM_QSTR(MP_QSTR_genstream), MP_ROM_PTR(&mp_module_genstream) },
 #endif
+#if MICROPY_PY_MPOLL
+    { MP_ROM_QSTR(MP_QSTR_mpoll), MP_ROM_PTR(&mp_module_mpoll) },
+#endif
 #if MICROPY_PY_FRAMEBUF
     { MP_ROM_QSTR(MP_QSTR_framebuf), MP_ROM_PTR(&mp_module_framebuf) },
 #endif
