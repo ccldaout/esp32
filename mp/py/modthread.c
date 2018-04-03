@@ -297,7 +297,7 @@ STATIC const mp_rom_map_elem_t mp_module_thread_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_start_new_thread), MP_ROM_PTR(&mod_thread_start_new_thread_obj) },
     { MP_ROM_QSTR(MP_QSTR_exit), MP_ROM_PTR(&mod_thread_exit_obj) },
     { MP_ROM_QSTR(MP_QSTR_allocate_lock), MP_ROM_PTR(&mod_thread_allocate_lock_obj) },
-    { MP_ROM_QSTR(MP_QSTR_CPU_CORES), MP_OBJ_NEW_SMALL_INT(2) },
+    { MP_ROM_QSTR(MP_QSTR_CPU_CORES), MP_OBJ_NEW_SMALL_INT(portNUM_PROCESSORS) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_thread_globals, mp_module_thread_globals_table);
