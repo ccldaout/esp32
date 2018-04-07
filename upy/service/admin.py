@@ -15,7 +15,6 @@ class AdminService(mipc.ServiceBase):
         self._logger = text_board.putline
 
     def reset(self, port, msg):
-        import boot.ena
         machine.reset()
 
     @mipc.autoreply

@@ -24,19 +24,33 @@ class HCSR04(object):
 
 class QTRxRC(object):
 
-    def __init__(self, pinnum_list, *,
-                 duration_us=30,
-                 timeout_us=50):
-        self._pins = [machine.Pin(n) for n in pinnum_list]
-        self.duration_us = duration_us
-        self.timeout_us = timeout_us
+    def __init__(self):
+        self._pins = []
+
+    def add_sensor(self, pin_num, duration_us, timeout_us, threshold_us=None):
+        if threshold_us is None:
+            threshold_us = timeout_us
+        self._pins.append((machine.Pin(pin_num), duration_us, timeout_us, threshold_us))
 
     def sense(self):
-        dur_us, tmo_us = self.duration_us, self.timeout_us
-        for pin in self._pins:
+        for pin, dur_us, tmo_us, _ in self._pins:
             pin.init(machine.Pin.OUT, value=1)
             time.sleep_us(dur_us)
             pin.init(machine.Pin.IN)
             us = machine.time_pulse_us(pin, 1, tmo_us)
             pin.init(machine.Pin.OUT, value=0)
             yield us
+
+    def sense_black(self):
+        for pin, dur_us, tmo_us, thr_us in self._pins:
+            pin.init(machine.Pin.OUT, value=1)
+            time.sleep_us(dur_us)
+            pin.init(machine.Pin.IN)
+            us = machine.time_pulse_us(pin, 1, tmo_us)
+            pin.init(machine.Pin.OUT, value=0)
+            if us == -2:
+                yield False
+            elif us == -1:
+                yield True
+            else:
+                yield (us >= thr_us)

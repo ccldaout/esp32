@@ -260,13 +260,16 @@ class Thread(object):
 
     __repr__ = __str__
 
-    def start(self):
+    def start(self, cpu_id=0):
         with self._g_lock:
             if not self._target:
                 raise RuntimeError('no target is specified or alread started.')
             self._started = True
             self._join_event.clear()
-            _thread.start_new_thread(self._thread, (self._target, self._args, self._kwargs))
+            if hasattr(_thread, 'CPU_CORES'):
+                _thread.start_new_thread(self._thread, (self._target, self._args, self._kwargs), cpu_id=cpu_id)
+            else:
+                _thread.start_new_thread(self._thread, (self._target, self._args, self._kwargs))
             self._target = None
 
     def join(self, timeout=None):
