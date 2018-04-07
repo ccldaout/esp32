@@ -32,6 +32,11 @@ class SSD1331(object):
         self._pixbuf = None
         self.rgb_max = (0, 0, 0)
         self.rgb_bits = (0, 0, 0)
+        self._disp_on = False
+        self._disp_sw_tv_ms = 0
+        if config.pin_sw is not None:
+            self._disp_sw = machine.Pin(36, machine.Pin.IN, machine.Pin.PULL_DOWN)
+            self._disp_sw.irq(self._toggle_display, machine.Pin.IRQ_FALLING)
         self._RMCD = 0
 
         # for performance
@@ -40,6 +45,17 @@ class SSD1331(object):
         self._dc_value = self._dc.value
         self.command = self._command
         self.send_pixels = self._send_pixels
+
+    # display on/off switch
+    def _toggle_display(self, *args):
+        t = time.ticks_ms()
+        if t < self._disp_sw_tv_ms:
+            return
+        self._disp_sw_tv_ms = t + 500
+        if self._disp_on:
+            self.set_display_off()
+        else:
+            self.set_display_on()
 
     # SPI interface
 
@@ -244,11 +260,13 @@ class SSD1331(object):
         self.command(b, 1)
 
     def set_display_off(self):
+        self._disp_on = False
         b = self._buf
         b[0] = 0xAE
         self.command(b, 1)
 
     def set_display_on(self):
+        self._disp_on = True
         b = self._buf
         b[0] = 0xAF
         self.command(b, 1)
