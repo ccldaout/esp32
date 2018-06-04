@@ -29,10 +29,14 @@ def _boot():
                 for s in f:
                     print(s.rstrip())
 
+        def rmmod(modname):
+            del sys.modules[modname]
+
         gdic = globals()
         gdic['cd'] = os.chdir
         gdic['ls'] = os.listdir
         gdic['cat'] = cat
+        gdic['rmmod'] = rmmod
 
     except Exception as e:
         sys.print_exception(e)
