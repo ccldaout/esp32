@@ -24,6 +24,9 @@ _REG_DATAZ1 = 0x37
 _REG_FIFO_CTL = 0x38
 _REG_FIFO_STATUS = 0x39
 
+def _int16(ui16):
+    return -(ui16 & 0x8000)|(ui16 & 0x7fff)
+
 class ADXL345(object):
 
     BW_RATE = _ntuple('BW_RATE', ('low_power', 'rate'))
@@ -124,9 +127,9 @@ class ADXL345(object):
 
     def read_data(self):
         v = self.read(_REG_DATAX0, 6)
-        return ((v[1] << 8) | v[0],
-                (v[3] << 8) | v[2],
-                (v[5] << 8) | v[4])
+        return (_int16((v[1] << 8) | v[0]),
+                _int16((v[3] << 8) | v[2]),
+                _int16((v[5] << 8) | v[4]))
 
     def read_fifo_ctl(self):
         v = self.read(_REG_FIFO_CTL)
@@ -149,3 +152,4 @@ import spi
 vspi = spi.SPI(spi.ID_VSPI)
 
 ad = ADXL345(vspi, 32)
+ad.write_power_ctl()
