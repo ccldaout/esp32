@@ -22,8 +22,8 @@ class SPI(object):
 
     def __new__(cls, id,
                  *,
-                 polarity,
-                 phase,
+                 polarity = 1,
+                 phase = 1,
                  mosi=None,
                  miso=None,
                  sck=None,
@@ -71,13 +71,17 @@ class SPI(object):
                                      phase=phase,
                                      bits=bits)
             self.__spi.init(mosi=self.mosi, miso=self.miso, sck=self.sck)
-        self.write = self.__spi.write
 
         if id == ID_HSPI:
-            type(self).HSPI = self
+            cls.HSPI = self
         elif id == ID_VSPI:
-            type(self).VSPI = self
+            cls.VSPI = self
         elif id == ID_SOFT:
-            type(self).SOFT_SPI = self
+            cls.SOFT_SPI = self
+
+        self.read = self.__spi.read
+        self.readinto = self.__spi.readinto
+        self.write = self.__spi.write
+        self.write_readinto = self.__spi.write_readinto
 
         return self
