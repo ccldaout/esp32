@@ -424,13 +424,16 @@ class SSD1331(object):
     def color_65k(self):
         self.set_remap_and_color_depth(color_format=1)
 
-def vspi(pinnum_dc=None, pinnum_rst=None):
+def vspi(pinnum_dc=None, pinnum_rst=None, pinnum_cs=None):
+    sck_hz = 6*1000*1000			# 6MHz
     if pinnum_dc is None:
         pinnum_dc = config.pin_dc
     if pinnum_rst is None:
         pinnum_rst = config.pin_rst
-    vspi = spi.SPI(spi.ID_VSPI, polarity=1, phase=1)
-    pinnum_cs = vspi.ss_number
+    if pinnum_cs is None:
+        pinnum_cs = config.pin_cs
+    vspi = spi.SPI(spi.ID_VSPI, polarity=1, phase=1,
+                   bits=8, baudrate=sck_hz)
     disp = SSD1331(spi=vspi,
                    pinnum_cs=pinnum_cs,		# Chip Select
                    pinnum_dc=pinnum_dc,		# Data/Command

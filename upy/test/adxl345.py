@@ -149,7 +149,8 @@ class ADXL345(object):
                                 (0x2f & v) >> 0)
 
 import spi
-vspi = spi.SPI(spi.ID_VSPI)
+vspi = spi.SPI(spi.ID_VSPI, polarity=1, phase=1,
+               bits=8, baudrate=5*1000*1000)
 
 ad = ADXL345(vspi, 32)
 ad.write_power_ctl()
