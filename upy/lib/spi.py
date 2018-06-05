@@ -30,16 +30,13 @@ class SPI(object):
 
         if id_ in (ID_HSPI, ID_VSPI):
             hw_attr = (id_, polarity, phase, bits, baudrate)
-            if attr in cls._hw_spi:
-                return cls._hw_spi[attr]
+            if hw_attr in cls._hw_spi:
+                return cls._hw_spi[hw_attr]
             if id_ == ID_HSPI:
                 mosi, miso, sck = HSPI_MOSI, HSPI_MISO, HSPI_SCK
             else:
                 mosi, miso, sck = VSPI_MOSI, VSPI_MISO, VSPI_SCK
-        elif id_ == ID_SOFT:
-            if cls.SOFT_SPI:
-                return cls.SOFT_SPI
-        else:
+        elif id_ != ID_SOFT:
             raise TypeError('invalid id')
             
         self = super().__new__(cls)
@@ -50,24 +47,15 @@ class SPI(object):
             self.miso = machine.Pin(miso, machine.Pin.IN)
         self.sck  = machine.Pin(sck,  machine.Pin.OUT)
         
-        if id_ == ID_SOFT:
-            # when id is ID_SOFT, initializer require sck/mosi/miso arguments.
-            self.__spi = machine.SPI(id_,
-                                     baudrate=baudrate,
-                                     polarity=polarity,
-                                     phase=phase,
-                                     sck=self.sck,
-                                     mosi=self.mosi,
-                                     miso=self.miso,
-                                     bits=bits)
-        else:
-            # when id is not ID_SOFT, initialize refuse sck/mosi/miso arguments.
-            self.__spi = machine.SPI(id_,
-                                     baudrate=baudrate,
-                                     polarity=polarity,
-                                     phase=phase,
-                                     bits=bits)
-            self.__spi.init(mosi=self.mosi, miso=self.miso, sck=self.sck)
+        self.__spi = machine.SPI(id_,
+                                 baudrate=baudrate,
+                                 polarity=polarity,
+                                 phase=phase,
+                                 bits=bits,
+                                 sck=self.sck,
+                                 mosi=self.mosi,
+                                 miso=self.miso)
+        if id_ != ID_SOFT:
             cls._hw_spi[hw_attr] = self.__spi
 
         self.read = self.__spi.read
