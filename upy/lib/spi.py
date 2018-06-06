@@ -56,7 +56,7 @@ class SPI(object):
                                  mosi=self.mosi,
                                  miso=self.miso)
         if id_ != ID_SOFT:
-            cls._hw_spi[hw_attr] = self.__spi
+            cls._hw_spi[hw_attr] = self
 
         self.read = self.__spi.read
         self.readinto = self.__spi.readinto
