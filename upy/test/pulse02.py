@@ -49,7 +49,7 @@ def meas(itv_ms=25):
         hc_s = '%5.1f' % hc
         _disp.clear()
         _disp.gcf_put(5, 5, hc_s)
-    pf = PeakFinder(int(250/itv_ms), 5)
+    pf = PeakFinder(int(300/itv_ms), 5)
     pf.callback = found
     while True:
         tv_next_ms = ticks_ms() + itv_ms
