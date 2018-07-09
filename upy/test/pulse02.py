@@ -6,7 +6,7 @@ from display import display as _disp
 
 class PeakFinder(object):
 
-    def __init__(self, h_width=6, raw_n=6, depth=200):
+    def __init__(self, h_width=6, raw_n=6, depth=100):
         self.__dv_h = h_width
         self.__raw_n = raw_n
         self.depth = depth
@@ -48,10 +48,13 @@ L_RGB = _disp.Color(0, (1<<6)-1, 0)
 
 def meas(itv_ms=30):
     _disp.clear()
+    updcnt = 0
     def found(tms):
+        nonlocal updcnt
+        updcnt += 1
         hc = 60000.0/tms
-        hc_s = '%5.1f' % hc
-        _disp.clear(5, 51, 45, 63)
+        hc_s = '%5.1f (%1d)' % (hc, updcnt)
+        _disp.clear(5, 51, 95, 63)
         _disp.gcf_put(5, 51, hc_s)
     _disp.clear()
     pf = PeakFinder(int(300/itv_ms), 5)
