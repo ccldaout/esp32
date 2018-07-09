@@ -26,7 +26,8 @@ class PeakFinder(object):
         dv = self.__dv
         hn = self.__dv_h
         dv.pop(0)
-        dv.append(self.__sum / self.__raw_n)
+        avg = self.__sum / self.__raw_n
+        dv.append(avg)
         mid = dv[hn]
         oth = dv[:hn] + dv[hn+1:]
         if mid > max(oth):
@@ -37,29 +38,34 @@ class PeakFinder(object):
             self.__inf_val, self.__inf_tms = 0, 0
         elif mid < min(oth):
             self.__inf_val, self.__inf_tms = mid, new_tms
+        return avg
 
 adc = machine.ADC(machine.Pin(35))
 
-D_MIN = 1100
-D_MAX = 1900
+D_MIN = 1300
+D_MAX = 1850
 L_RGB = _disp.Color(0, (1<<6)-1, 0)
 
-def meas(itv_ms=25):
+def meas(itv_ms=30):
     _disp.clear()
     def found(tms):
         hc = 60000.0/tms
         hc_s = '%5.1f' % hc
-        _disp.clear(0, 61)
-        _disp.gcf_put(5, 62, hc_s)
+        _disp.clear(5, 51, 45, 63)
+        _disp.gcf_put(5, 51, hc_s)
     _disp.clear()
     pf = PeakFinder(int(300/itv_ms), 5)
     pf.callback = found
+    og = 0
     while True:
         v = adc.read()
-        pf.update(ticks_ms(), v)
-        v = int(60 * (1 - ((v - D_MIN) / (D_MAX - D_MIN))))
-        v = min(59, v)
-        v = max( 0, v)
-        _disp.copy(1, 0, 95, 59, 0, 0)
-        _disp.draw_line(95, v, 95, v, L_RGB)
+        v = pf.update(ticks_ms(), v)
+        g = int(50 * (1 - ((v - D_MIN) / (D_MAX - D_MIN))))
+        g = min(49, g)
+        g = max( 0, g)
+        _disp.copy(1, 0, 95, 50, 0, 0)
         sleep_ms(itv_ms)
+        _disp.clear(95, 0, 95, 50)
+        _disp.draw_line(94, og, 95, g, L_RGB)
+        og = g
+        print(v, g)
