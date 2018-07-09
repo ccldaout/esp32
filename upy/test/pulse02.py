@@ -10,7 +10,7 @@ class PeakFinder(object):
         self.__dv_h = h_width
         self.__raw_n = raw_n
         self.depth = depth
-        self.callback = lambda _:None
+        self.callback = lambda t:None
         self.__sum = 0
         self.__dv = [0] * (h_width * 2 + 1)
         self.__rv = [0] * raw_n
@@ -40,16 +40,26 @@ class PeakFinder(object):
 
 adc = machine.ADC(machine.Pin(35))
 
+D_MIN = 1100
+D_MAX = 1900
+L_RGB = _disp.Color(0, (1<<6)-1, 0)
+
 def meas(itv_ms=25):
     _disp.clear()
     def found(tms):
         hc = 60000.0/tms
         hc_s = '%5.1f' % hc
-        _disp.clear()
-        _disp.gcf_put(5, 5, hc_s)
+        _disp.clear(0, 61)
+        _disp.gcf_put(5, 62, hc_s)
+    _disp.clear()
     pf = PeakFinder(int(300/itv_ms), 5)
     pf.callback = found
     while True:
         v = adc.read()
         pf.update(ticks_ms(), v)
+        v = int(60 * (1 - ((v - D_MIN) / (D_MAX - D_MIN))))
+        v = min(59, v)
+        v = max( 0, v)
+        _disp.copy(1, 0, 95, 59, 0, 0)
+        _disp.draw_line(95, v, 95, v, L_RGB)
         sleep_ms(itv_ms)
