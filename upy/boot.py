@@ -43,3 +43,10 @@ def _boot():
 
 _boot()
 del _boot
+
+try:
+    import _thread
+    from main import main
+    _thread.start_new_thread(main, ())
+except:
+    pass

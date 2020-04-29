@@ -23,7 +23,7 @@ class MAX32664(object):
     __delay_enable_ms = 45
     __delay_cmd_ms = 6
 
-    def __init__(self, scl=22, sda=21, rst=32, mfio=33):
+    def __init__(self, scl=33, sda=32, rst=25, mfio=26):
         self.__i2c = machine.I2C(scl=machine.Pin(scl),
                                  sda=machine.Pin(sda))
         self.__mfio = machine.Pin(mfio, machine.Pin.OUT)
