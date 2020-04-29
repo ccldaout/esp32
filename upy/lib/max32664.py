@@ -7,16 +7,17 @@ class MAX32664(object):
     __delay_enable_ms = 45
     __delay_cmd_ms = 6
 
-    def __init__(self, scl=22, sda=21, rst=32):
+    def __init__(self, scl=22, sda=21, rst=32, mfio=33):
         self.__i2c = machine.I2C(scl=machine.Pin(scl),
                                  sda=machine.Pin(sda))
+        self.__mfio = machine.Pin(mfio, machine.Pin.OUT, 1)
         self.__rst = machine.Pin(rst, machine.Pin.OUT)
         self.__rst.value(1)
         self.__rst.value(0)
-        time.sleep_us(10)
+        time.sleep_ms(10)
         self.__rst.value(1)
-        time.sleep_us(60)
-        time.sleep_ms(500)
+        time.sleep_ms(1000)
+        self.__mfio.init(machine.Pin.IN, machine.Pin.PULL_UP)
 
     def init(self):
         self.__cmd('\x02\x00')
