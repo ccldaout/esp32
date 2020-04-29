@@ -95,7 +95,6 @@ class MAX32664(object):
 
     def get(self):
         # Read sensor hub status
-        notify = False
         while True:
             self._cmd([0x00, 0x00])
             s, r = self._readreply()
@@ -105,10 +104,7 @@ class MAX32664(object):
                 raise Exception('Unexpceted Sensor HUB status: %d' % r)
             if (r & 0x8) != 0:
                 break
-            if not notify:
-                notify = True
-                print('NO DataRdyInt ... 0x%x' % r)
-            time.sleep_ms(10)
+            time.sleep_ms(100)
 
         ### Read # of samples available in the FIFO
         ##self._cmd([0x12, 0x00])
