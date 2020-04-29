@@ -110,10 +110,10 @@ class MAX32664(object):
                 print('NO DataRdyInt ... 0x%x' % r)
             time.sleep_ms(10)
 
-        # Read # of samples available in the FIFO
-        self._cmd([0x12, 0x00])
-        s, r = self._readreply()
-        print('Read # of samples available in the FIFO', r)
+        ### Read # of samples available in the FIFO
+        ##self._cmd([0x12, 0x00])
+        ##s, r = self._readreply()
+        ##print('Read # of samples available in the FIFO', r)
 
         # Read data stored in output FIFO
         self._cmd([0x12, 0x01])
@@ -124,7 +124,3 @@ class MAX32664(object):
     @property
     def mfio(self):
         return self.__mfio()
-
-
-mx = MAX32664()
-mx.init()
