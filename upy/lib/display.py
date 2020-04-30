@@ -127,7 +127,11 @@ class AdaptorBase(object):
         if use_fcf:
             self.fcf = FixedColorFont()
         if use_gcf:
-            self.gcf = GraphicCompositFont()
+            self.gcf_list = [
+                GraphicCompositFont('mplus_10x5.gcf'),
+                GraphicCompositFont('mplus_12x5.gcf')
+            ]
+            self.gcf = self.gcf_list[0]
         
         # colors: public properties
         self.line_color = Color(0, 0, 0)	# RGB
@@ -185,6 +189,14 @@ class AdaptorBase(object):
     @property
     def gcf_size(self):
         return (self.gcf.WIDTH, self.gcf.HEIGHT)
+
+    @property
+    def gcf_index(self):
+        return self.gcf_list.index(self.gcf)
+
+    @gcf_index.setter
+    def gcf_index(self, i):
+        self.gcf = self.gcf_list[i]
 
     def fcf_put(self, col, row, chars, spacing=0):
         raise NotImplementedError()
