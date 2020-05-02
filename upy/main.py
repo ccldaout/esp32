@@ -1,6 +1,5 @@
-from test.pulse03 import meas
+from test.pulse03a import meas
 import time
 
 def main():
-    time.sleep(5)
     meas()

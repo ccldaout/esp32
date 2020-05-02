@@ -53,4 +53,5 @@ def server():
             except Exception as e:
                 sys.print_exception(e)
 
-_thread.start_new_thread(server, ())
+def start(*args, **kws):
+    _thread.start_new_thread(server, ())
