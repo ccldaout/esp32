@@ -2,6 +2,7 @@ import os
 import sys
 import _thread
 import ssd1331
+import machine
 import mipc
 import wifi
 import service
@@ -90,9 +91,7 @@ class WifiProgressSSD1331(wifi.WifiProgressBase):
         self._disp_message('Ready !!')
 
 
-def _start(main_func=None):
-    disp_ssd1331 = setup_SSD1331() if config.ssd1331 else None
-
+def setup_Wifi(disp_ssd1331=None):
     progress = wifi.WifiProgressBase()
     if config.progress_ssd1331 and disp_ssd1331:
         try:
@@ -109,6 +108,16 @@ def _start(main_func=None):
             mod = getattr(svcmod, svcname)
             register = getattr(mod, 'register')
             register()
+    
+
+def _start(main_func=None):
+    disp_ssd1331 = setup_SSD1331() if config.ssd1331 else None
+
+    if config.enable_wifi_pin is not None:
+        p = machine.Pin(config.enable_wifi_pin, machine.Pin.IN)
+        if p.value() == 0:
+            setup_Wifi(disp_ssd1331)
+
     if main_func:
         main_func()
 
