@@ -25,7 +25,8 @@ class MAX32664(object):
 
     def __init__(self, scl=33, sda=25, rst=32, mfio=26):
         self.__i2c = machine.I2C(scl=machine.Pin(scl),
-                                 sda=machine.Pin(sda))
+                                 sda=machine.Pin(sda),
+                                 freq=100000)			# original: 400kHz
         self.__mfio = machine.Pin(mfio, machine.Pin.OUT)
         self.__rst = machine.Pin(rst, machine.Pin.OUT)
         self.__mfio.value(1)
