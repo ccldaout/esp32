@@ -93,6 +93,8 @@ if len(sys.argv) == 1:
     print '              service SERVICE'
     print '              display {on|off}'
     print '              reset'
+    print ''
+    print ' environment: ESP32_ADDR'
     exit()
 
 if sys.argv[1] == 'reset':
