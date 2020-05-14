@@ -2,6 +2,7 @@ import os
 import sys
 import _thread
 import ssd1331
+import machine
 import mipc
 import wifi
 import service
@@ -9,16 +10,18 @@ import service
 from config.boot_full import config
 
         
+def setup_SSD1331():
+    driver = ssd1331.vspi()
+    driver.color_65k()
+    driver.set_remap_and_color_depth(column_reverse_order=True,
+                                     scan_reverse_on_COM=True)
+    driver.enable_fill()
+    return ssd1331.Adaptor(driver, fcf=True, gcf=True)
+    
+
 class WifiProgressSSD1331(wifi.WifiProgressBase):
 
-    def __init__(self):
-        driver = ssd1331.vspi()
-        driver.color_65k()
-        driver.set_remap_and_color_depth(column_reverse_order=True,
-                                         scan_reverse_on_COM=True)
-        driver.enable_fill()
-        disp = ssd1331.Adaptor(driver, fcf=True, gcf=True)
-
+    def __init__(self, disp):
         self._top_bg = disp.Color(0, 0, 2)
         self._mode_bg1 = disp.Color(31, 0, 0) 
         self._mode_bg2 = disp.Color(0, 54, 0)
@@ -88,13 +91,14 @@ class WifiProgressSSD1331(wifi.WifiProgressBase):
         self._disp_message('Ready !!')
 
 
-def start_wifi():
+def setup_Wifi(disp_ssd1331=None):
     progress = wifi.WifiProgressBase()
-    if config.progress_ssd1331:
+    if config.progress_ssd1331 and disp_ssd1331:
         try:
-            progress = WifiProgressSSD1331()
+            progress = WifiProgressSSD1331(disp_ssd1331)
         except:
             pass
+
     wlan = wifi.WifiNetwork(progress)
     if not wlan.try_station_mode():
         wlan.start_ap_mode()
@@ -104,5 +108,19 @@ def start_wifi():
             mod = getattr(svcmod, svcname)
             register = getattr(mod, 'register')
             register()
+    
 
-_thread.start_new_thread(start_wifi, ())
+def _start(main_func=None):
+    disp_ssd1331 = setup_SSD1331() if config.ssd1331 else None
+
+    if config.enable_wifi_pin is not None:
+        p = machine.Pin(config.enable_wifi_pin, machine.Pin.IN)
+        if p.value() == 0:
+            setup_Wifi(disp_ssd1331)
+
+    if main_func:
+        main_func()
+
+
+def start(main=None, *args, **kws):
+    _thread.start_new_thread(_start, (main,))
