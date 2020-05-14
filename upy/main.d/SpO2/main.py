@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
+
 import max32664
 import time
+
 
 class Disp(object):
 
@@ -45,7 +47,8 @@ class Disp(object):
             self._tv_lim = tv_cur + 1000
 
 
-def meas(itv_ms=50):
+def main():
+    itv_ms=200
     
     def get(self):
         # Read sensor hub status

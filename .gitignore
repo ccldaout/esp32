@@ -2,3 +2,4 @@
 *.fcf
 *.bdf
 ssid.lis
+upy/main.py
