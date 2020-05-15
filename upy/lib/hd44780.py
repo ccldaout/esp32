@@ -43,9 +43,8 @@ class PCF8574(IOBase):
 
 class GPIO(IOBase):
 
-    def __init__(self, rs=19, rw=18, en=5, d4_7=(33, 25, 26, 27)):
+    def __init__(self, rs=19, en=18, d4_7=(33, 25, 26, 27)):
         self.__pins = (machine.Pin(rs, machine.Pin.OUT),
-                       machine.Pin(rw, machine.Pin.OUT),
                        machine.Pin(en, machine.Pin.OUT),
                        machine.Pin(d4_7[0], machine.Pin.OUT),	# D4
                        machine.Pin(d4_7[1], machine.Pin.OUT),	# D5
@@ -54,11 +53,10 @@ class GPIO(IOBase):
 
     def write4(self, is_data, val4):
         sleep_us = time.sleep_us
-        rs, rw, en, d4, d5, d6, d7 = self.__pins
+        rs, en, d4, d5, d6, d7 = self.__pins
 
         en.value(0)			# 0:disable
         rs.value(int(is_data))		# 0:command, 1:data
-        rw.value(0)			# 0:write
         sleep_us(1)			# >= 50ns
 
         en.value(1)			# 1:enable
@@ -104,12 +102,13 @@ class HD44780(object):
     def cmd(self, b8):
         self._write4(False, b8 >> 4)
         self._write4(False, b8 & 0xf)
+        time.sleep_us(40)
         return self
 
     def data(self, b8):
         self._write4(True, b8 >> 4)
         self._write4(True, b8 & 0xf)
-        time.sleep_us(37)
+        time.sleep_us(40)
         return  self
 
     def clear_display(self):
@@ -118,7 +117,6 @@ class HD44780(object):
 
     def return_home(self):
         self.cmd((1<<1))
-        time.sleep_us(1520)
         return self
 
     def entry_mode(self, cursor_right=None, shift_disp=None):
@@ -128,7 +126,6 @@ class HD44780(object):
             shift_disp = self.__putc_shift_disp
         cmd = (1<<2) | (int(cursor_right) << 1) | (int(shift_disp) << 0)
         self.cmd(cmd)
-        time.sleep_us(37)
         return self
 
     def display(self, display=None, block_cursor=None, blink=None):
@@ -140,7 +137,6 @@ class HD44780(object):
             blink = self.__blink
         cmd = (1<<3) | (int(display) << 2) | (int(block_cursor) << 1) | (int(blink) << 0)
         self.cmd(cmd)
-        time.sleep_us(37)
         return self
 
     def shift(self, display=None, to_right=None):
@@ -150,7 +146,6 @@ class HD44780(object):
             to_right = self.__shift_right
         cmd = (1<<4) | (int(display) << 3) | (int(to_right) << 2)
         self.cmd(cmd)
-        time.sleep_us(37)
         return self
 
     def function(self, double_line=None, big_font=None):
@@ -161,19 +156,16 @@ class HD44780(object):
             big_font = self.__5x10dot
         cmd = (1<<5) | (int(bit8) << 4) | (int(double_line) << 3) | (int(big_font) << 2)
         self.cmd(cmd)
-        time.sleep_us(37)
         return self
 
     def cgram(self, addr):
         cmd = (1<<6) | addr
         self.cmd(cmd)
-        time.sleep_us(37)
         return self
 
     def ddram(self, addr):
         cmd = (1<<7) | addr
         self.cmd(cmd)
-        time.sleep_us(37)
         return self
 
     def puts(self, row, col, s):
@@ -195,7 +187,7 @@ class HD44780(object):
         self._write4(False, 0x2)	# become 4-bit mode
 
         self.function()
-        self.display(display=False, block_cursor=False, blink=False)
+        self.display(block_cursor=False, blink=False)
         self.clear_display()
         self.entry_mode()
 
