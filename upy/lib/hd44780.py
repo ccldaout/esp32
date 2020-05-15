@@ -93,7 +93,6 @@ class HD44780(object):
 	self.__shift_right = False
 
         # Functin Set
-        self.__8bit = False
         self.__2lines = True
         self.__5x10dot = False
 
@@ -149,7 +148,7 @@ class HD44780(object):
         return self
 
     def function(self, double_line=None, big_font=None):
-        bit8 = self.__8bit
+        bit8 = 0
         if double_line is None:
             double_line = self.__2lines
         if big_font is None:
@@ -170,7 +169,7 @@ class HD44780(object):
 
     def puts(self, row, col, s):
         if row != 0:
-            col += 40
+            col += 0x40
         self.ddram(col)
         for c in s:
             self.data(ord(c))
