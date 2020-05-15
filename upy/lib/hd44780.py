@@ -2,37 +2,22 @@ import machine
 import time
 
 
-class LCD1602(object):
+class IOBase(object):
 
-    __addr = 0x27
+    def write4(self, is_data, val4):
+        raise NotImplementedError()
 
-    def __init__(self, scl=33, sda=25):
+
+class PCF8574(IOBase):
+
+    def __init__(self, addr=0x27, scl=33, ada=25):
+        self.__addr = addr
         self.__i2c = machine.I2C(scl=machine.Pin(scl),
                                  sda=machine.Pin(sda),
                                  freq=100000)
         self.__buf = bytearray(1)
 
-        # Entry Mode Set
-        self.__putc_cursor_right = True
-        self.__putc_shift_disp = False
-
-        # Display ON/OFF
-        self.__display = True
-        self.__block_cursor = False
-        self.__blink = False
-
-        # Cursor or Display Shift
-        self.__shift_disp = False	# False -> shift cursor
-	self.__shift_right = False
-
-        # Functin Set
-        self.__8bit = False
-        self.__2lines = True
-        self.__5x10dot = False
-
-        self.backlight = True
-
-    def _write4(self, is_data, val4):
+    def write4(self, is_data, val4):
         sleep_us = time.sleep_us
         writeto = self.__i2c.writeto
         addr = self.__addr
@@ -55,10 +40,70 @@ class LCD1602(object):
         writeto(addr, buf)
         sleep_us(1)			# >= 200ns
 
-        return self
+
+class GPIO(IOBase):
+
+    def __init__(self, rs=19, rw=18, en=5, d4_7=(33, 25, 26, 27)):
+        self.__pins = (machine.Pin(rs, machine.Pin.OUT),
+                       machine.Pin(rw, machine.Pin.OUT),
+                       machine.Pin(en, machine.Pin.OUT),
+                       machine.Pin(d4_7[0], machine.Pin.OUT),	# D4
+                       machine.Pin(d4_7[1], machine.Pin.OUT),	# D5
+                       machine.Pin(d4_7[2], machine.Pin.OUT),	# D6
+                       machine.Pin(d4_7[3], machine.Pin.OUT))	# D7
+
+    def write4(self, is_data, val4):
+        sleep_us = time.sleep_us
+        rs, rw, en, d4, d5, d6, d7 = self.__pins
+
+        en.value(0)			# 0:disable
+        rs.value(int(is_data)))		# 0:command, 1:data
+        rw.value(0)			# 0:write
+        sleep_us(1)			# >= 50ns
+
+        en.value(1)			# 1:enable
+        d4.value((val4 & 0x1))
+        val4 >>= 1
+        d5.value((val4 & 0x1))
+        val4 >>= 1
+        d6.value((val4 & 0x1))
+        val4 >>= 1
+        d7.value((val4 & 0x1))
+        sleep_us(1)			# >= 80ns
+
+        en.value(0)
+        sleep_us(1)			# >= 10ns
+
+
+class HD44780(object):
+
+    def __init__(self, io):
+        self.__io = io
+        self._write4 = io.write4
+
+        # Entry Mode Set
+        self.__putc_cursor_right = True
+        self.__putc_shift_disp = False
+
+        # Display ON/OFF
+        self.__display = True
+        self.__block_cursor = False
+        self.__blink = False
+
+        # Cursor or Display Shift
+        self.__shift_disp = False	# False -> shift cursor
+	self.__shift_right = False
+
+        # Functin Set
+        self.__8bit = False
+        self.__2lines = True
+        self.__5x10dot = False
+
+        self.backlight = True
 
     def cmd(self, b8):
-        self._write4(False, b8 >> 4)._write4(False, b8 & 0xf)
+        self._write4(False, b8 >> 4)
+        self._write4(False, b8 & 0xf)
         return self
 
     def clear_display(self):
@@ -126,7 +171,8 @@ class LCD1602(object):
         return self
 
     def data(self, b8):
-        self._write4(True, b8 >> 4)._write4(True, b8 & 0xf)
+        self._write4(True, b8 >> 4)
+        self._write4(True, b8 & 0xf)
         time.sleep_us(37)
         return  self
 
