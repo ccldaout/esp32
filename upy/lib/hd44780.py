@@ -15,7 +15,7 @@ class PCF8574(IOBase):
         self.__i2c = machine.I2C(scl=machine.Pin(scl, machine.Pin.OUT),
                                  sda=machine.Pin(sda, machine.Pin.OUT),
                                  freq=100000)
-        self.__buf = bytearray(1)
+        self.__buf = bytearray(3)
         self.backlight = True
 
     def write4(self, is_data, val4):
@@ -24,21 +24,11 @@ class PCF8574(IOBase):
         addr = self.__addr
         buf = self.__buf
 
-        bl = int(self.backlight) << 3
-        rs = int(is_data) << 0
-        rs_val4 = rs | (val4 << 4)
-
-        buf[0] = bl | rs
+        b8 = (val4 << 4) | (int(self.backlight) << 3) | int(is_data)
+        buf[0] = b8
+        buf[1] = b8 | (1<<2)	# Enable bit is ON
+        buf[2] = b8
         writeto(addr, buf)
-        sleep_us(1)			# >= 50ns
-
-        buf[0] = bl | rs_val4 | (1<<2)	# Enable bit is ON
-        writeto(addr, buf)
-        sleep_us(1)			# >= 80ns
-
-        buf[0] = bl | rs_val4		# Enable bit if OFF
-        writeto(addr, buf)
-        sleep_us(1)			# >= 10ns
 
 
 class GPIO(IOBase):
@@ -57,7 +47,7 @@ class GPIO(IOBase):
 
         en.value(0)			# 0:disable
         rs.value(int(is_data))		# 0:command, 1:data
-        sleep_us(1)			# >= 50ns
+        sleep_us(1)			# Wait t_as
 
         en.value(1)			# 1:enable
         d4.value((val4 & 0x1))
@@ -67,10 +57,10 @@ class GPIO(IOBase):
         d6.value((val4 & 0x1))
         val4 >>= 1
         d7.value((val4 & 0x1))
-        sleep_us(1)			# >= 80ns
+        sleep_us(1)			# Wait PW_eh and t_dsw
 
         en.value(0)
-        sleep_us(1)			# >= 10ns
+        sleep_us(1)			# Wait t_h
 
 
 class HD44780(object):
