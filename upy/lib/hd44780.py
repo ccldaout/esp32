@@ -106,6 +106,12 @@ class HD44780(object):
         self._write4(False, b8 & 0xf)
         return self
 
+    def data(self, b8):
+        self._write4(True, b8 >> 4)
+        self._write4(True, b8 & 0xf)
+        time.sleep_us(37)
+        return  self
+
     def clear_display(self):
         self.cmd((1<<0))
         return self
@@ -169,12 +175,6 @@ class HD44780(object):
         self.cmd(cmd)
         time.sleep_us(37)
         return self
-
-    def data(self, b8):
-        self._write4(True, b8 >> 4)
-        self._write4(True, b8 & 0xf)
-        time.sleep_us(37)
-        return  self
 
     def puts(self, row, col, s):
         if row != 0:
