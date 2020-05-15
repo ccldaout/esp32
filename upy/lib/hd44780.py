@@ -57,7 +57,7 @@ class GPIO(IOBase):
         rs, rw, en, d4, d5, d6, d7 = self.__pins
 
         en.value(0)			# 0:disable
-        rs.value(int(is_data)))		# 0:command, 1:data
+        rs.value(int(is_data))		# 0:command, 1:data
         rw.value(0)			# 0:write
         sleep_us(1)			# >= 50ns
 
