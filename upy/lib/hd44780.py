@@ -10,12 +10,13 @@ class IOBase(object):
 
 class PCF8574(IOBase):
 
-    def __init__(self, addr=0x27, scl=33, ada=25):
+    def __init__(self, addr=0x27, scl=33, sda=25):
         self.__addr = addr
-        self.__i2c = machine.I2C(scl=machine.Pin(scl),
-                                 sda=machine.Pin(sda),
+        self.__i2c = machine.I2C(scl=machine.Pin(scl, machine.Pin.OUT),
+                                 sda=machine.Pin(sda, machine.Pin.OUT),
                                  freq=100000)
         self.__buf = bytearray(1)
+        self.backlight = True
 
     def write4(self, is_data, val4):
         sleep_us = time.sleep_us
@@ -30,15 +31,14 @@ class PCF8574(IOBase):
         buf[0] = bl | rs
         writeto(addr, buf)
         sleep_us(1)			# >= 50ns
+
         buf[0] = bl | rs_val4 | (1<<2)	# Enable bit is ON
         writeto(addr, buf)
-        sleep_us(1)			# >= 250ns
+        sleep_us(1)			# >= 80ns
+
         buf[0] = bl | rs_val4		# Enable bit if OFF
         writeto(addr, buf)
-        sleep_us(1)			# >= 50ns
-        buf[0] = bl
-        writeto(addr, buf)
-        sleep_us(1)			# >= 200ns
+        sleep_us(1)			# >= 10ns
 
 
 class GPIO(IOBase):
@@ -185,7 +185,7 @@ class HD44780(object):
         self._write4(False, 0x3)
         self._write4(False, 0x2)	# become 4-bit mode
 
-        self.function()
+        self.function(double_line=True, big_font=False)
         self.display(block_cursor=False, blink=False)
         self.clear_display()
         self.entry_mode()
